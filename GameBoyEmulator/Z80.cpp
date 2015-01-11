@@ -1,6 +1,17 @@
 
 #include "Z80.h"
 
+/*
+Procek.
+Prosty schemat dzia³ania: 
+- pobierz	(funkcja dispatch pobiera pierwszy bajt pod adresem (czyli sam rozkaz)
+- dekoduj	(w tablicy _map trzymane s¹ wszystkie funkcje pod indeksami odpowiadaj¹cymi ich reprezentacji binarnej (np. x00h = rozkaz NOP)
+			dlatego odwo³anie siê do tablicy _map[numer_rozkazu] wywo³a po¿¹dan¹ funkcjê (na razie w teorii)..)
+- wykonaj	(wywo³anie odpowiedniej funkcji w dekodowaniu spowoduje jej wykonanie. Je¿eli funkcja posiada dodatkowe parametry 
+			(rozkaz ma rozmiar od 1 do 3 bajtów w³¹cznie z danymi, dlatego same dane mog¹ nie wyst¹piæ lub mieæ od 1 do 2 bajtów)
+			to sama sobie je pobiera i analizuje. Tutaj trzeba zaimplementowaæ wszystkie funkcje, na tym na pocz¹tku siê skupiam.)
+*/
+
 Z80::Z80()
 {
 	init();
@@ -32,7 +43,7 @@ void Z80::reset()
 void Z80::dispatch()
 {
 	_r.r = (_r.r + 1) & 127; //tlumaczenie pobranego polecenia na kod. Nie wiem czy to dziala jak powinno, byæ mo¿e jest zbêdne.
-	_map[mmu.rb(_r.pc++)]();
+	*this.*_map[mmu.rb(_r.pc++)]();
 	_r.pc &= 65535;
 	_clock.m += _r.m;
 }
@@ -52,6 +63,10 @@ void Z80::init()
 
 	};
 }
+
+/*
+Tu nie mo¿e byæ taki burdel.. Posortujê to sobie wed³ug jakiejœ kolejnoœci, mo¿e jak ma ten ³ebek z tutorialu od javascriptu.
+*/
 
 //00
 void Z80::NOP() { _r.m = 1; }
