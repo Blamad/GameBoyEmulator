@@ -21,8 +21,8 @@ MMU::MMU()
 
 void MMU::init()
 {
-	 _rom = load("file.GB");		  //Zaladowanie romu
-	 _carttype = _rom[0x0147];		//Ustalenie typu kartidza
+	 _rom = load("file.GB");		  
+	 _carttype = _rom[0x0147];		
 	 _inbios = 1;
 
 	 _bios = { };
