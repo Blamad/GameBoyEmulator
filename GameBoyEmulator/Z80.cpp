@@ -1,6 +1,7 @@
 
 #include "Z80.h"
 #include "MMU.h"
+#include <iostream>
 /*
 Procek.
 Prosty schemat dzia³ania: 
@@ -37,6 +38,10 @@ void Z80::reset()
 	_r.m = 0;
 	_r.t = 0;
 	_r.r = 0;
+	_r.ime = 1;
+
+	_stop = 0;
+	_halt = 0;
 
 	_clock.m = 0;
 	_clock.t = 0;
@@ -44,16 +49,19 @@ void Z80::reset()
 
 void Z80::dispatch()
 {
-	_r.r = (_r.r + 1) & 127; //tlumaczenie pobranego polecenia na kod. Nie wiem czy to dziala jak powinno, byæ mo¿e jest zbêdne.
+	_r.r++; //Licznik poleceñ? Po kij mi to tutaj? Mo¿e jakiœ debag czy cuœ..
 	(this->*_map[_mmu->rb(_r.pc++)])();
-	_r.pc &= 65535;
 	_clock.m += _r.m;
+	_clock.t += _r.t;
 }
 
 void Z80::init()
 {
-	R _r = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+	R _r = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 	Clock _clock = {0, 0};
+
+	_stop = 0;
+	_halt = 0;
 }
 
 Z80::OpCodeMap Z80::_map[] = 
@@ -64,7 +72,7 @@ Z80::OpCodeMap Z80::_map[] =
 		&Z80::LDnnSP,	&Z80::ADDHLBC,	&Z80::LDABCn,	&Z80::DECBC,
 		&Z80::INCr_c,	&Z80::DECr_c,	&Z80::LDrn_c,	&Z80::RRCA,
 		// 10
-		&Z80::DJNZn,	&Z80::LDDEnn,	&Z80::LDDEnA,	&Z80::INCDE,
+		&Z80::STOP,		&Z80::LDDEnn,	&Z80::LDDEnA,	&Z80::INCDE,
 		&Z80::INCr_d,	&Z80::DECr_d,	&Z80::LDrn_d,	&Z80::RLA,
 		&Z80::JRn,		&Z80::ADDHLDE,	&Z80::LDADEn,	&Z80::DECDE,
 		&Z80::INCr_e,	&Z80::DECr_e,	&Z80::LDrn_e,	&Z80::RRA,
@@ -139,6 +147,91 @@ Z80::OpCodeMap Z80::_map[] =
 		&Z80::LDHLSPn,	&Z80::XX,		&Z80::LDAnn,	&Z80::EI,
 		&Z80::XX,		&Z80::XX,		&Z80::CPn,		&Z80::RST38
 	};
+
+Z80::OpCodeMap Z80::_CBmap[] = 
+	{
+		// CB00
+		&Z80::RLCr_b,	&Z80::RLCr_c,	&Z80::RLCr_d,	&Z80::RLCr_e,
+		&Z80::RLCr_h,	&Z80::RLCr_l,	&Z80::RLCHL,	&Z80::RLCr_a,
+		&Z80::RRCr_b,	&Z80::RRCr_c,	&Z80::RRCr_d,	&Z80::RRCr_e,
+		&Z80::RRCr_h,	&Z80::RRCr_l,	&Z80::RRCHL,	&Z80::RRCr_a,
+		// CB10
+		&Z80::RLr_b,	&Z80::RLr_c,	&Z80::RLr_d,	&Z80::RLr_e,
+		&Z80::RLr_h,	&Z80::RLr_l,	&Z80::RLHL,		&Z80::RLr_a,
+		&Z80::RRr_b,	&Z80::RRr_c,	&Z80::RRr_d,	&Z80::RRr_e,
+		&Z80::RRr_h,	&Z80::RRr_l,	&Z80::RRHL,		&Z80::RRr_a,
+		// CB20
+		&Z80::SLAr_b,	&Z80::SLAr_c,	&Z80::SLAr_d,	&Z80::SLAr_e,
+		&Z80::SLAr_h,	&Z80::SLAr_l,	&Z80::SLAHL,	&Z80::SLAr_a,
+		&Z80::SRAr_b,	&Z80::SRAr_c,	&Z80::SRAr_d,	&Z80::SRAr_e,
+		&Z80::SRAr_h,	&Z80::SRAr_l,	&Z80::SRAHL,	&Z80::SRAr_a,
+		// CB30
+		&Z80::SWAPr_b,	&Z80::SWAPr_c,	&Z80::SWAPr_d,	&Z80::SWAPr_e,
+		&Z80::SWAPr_h,	&Z80::SWAPr_l,	&Z80::SWAPHL,	&Z80::SWAPr_a,
+		&Z80::SRLr_b,	&Z80::SRLr_c,	&Z80::SRLr_d,	&Z80::SRLr_e,
+		&Z80::SRLr_h,	&Z80::SRLr_l,	&Z80::SRLHL,		&Z80::SRLr_a,
+		// CB40
+		&Z80::BIT0b,	&Z80::BIT0c,	&Z80::BIT0d,	&Z80::BIT0e,
+		&Z80::BIT0h,	&Z80::BIT0l,	&Z80::BIT0n,	&Z80::BIT0a,
+		&Z80::BIT1b,	&Z80::BIT1c,	&Z80::BIT1d,	&Z80::BIT1e,
+		&Z80::BIT1h,	&Z80::BIT1l,	&Z80::BIT1n,	&Z80::BIT1a,
+		// CB50
+		&Z80::BIT2b,	&Z80::BIT2c,	&Z80::BIT2d,	&Z80::BIT2e,
+		&Z80::BIT2h,	&Z80::BIT2l,	&Z80::BIT2n,	&Z80::BIT2a,
+		&Z80::BIT3b,	&Z80::BIT3c,	&Z80::BIT3d,	&Z80::BIT3e,
+		&Z80::BIT3h,	&Z80::BIT3l,	&Z80::BIT3n,	&Z80::BIT3a,
+		// CB60
+		&Z80::BIT4b,	&Z80::BIT4c,	&Z80::BIT4d,	&Z80::BIT4e,
+		&Z80::BIT4h,	&Z80::BIT4l,	&Z80::BIT4n,	&Z80::BIT4a,
+		&Z80::BIT5b,	&Z80::BIT5c,	&Z80::BIT5d,	&Z80::BIT5e,
+		&Z80::BIT5h,	&Z80::BIT5l,	&Z80::BIT5n,	&Z80::BIT5a,
+		// CB70
+		&Z80::BIT6b,	&Z80::BIT6c,	&Z80::BIT6d,	&Z80::BIT6e,
+		&Z80::BIT6h,	&Z80::BIT6l,	&Z80::BIT6n,	&Z80::BIT6a,
+		&Z80::BIT7b,	&Z80::BIT7c,	&Z80::BIT7d,	&Z80::BIT7e,
+		&Z80::BIT7h,	&Z80::BIT7l,	&Z80::BIT7n,	&Z80::BIT7a,
+		// CB80
+		&Z80::RES0b,	&Z80::RES0c,	&Z80::RES0d,	&Z80::RES0e,
+		&Z80::RES0h,	&Z80::RES0l,	&Z80::RES0n,	&Z80::RES0a,
+		&Z80::RES1b,	&Z80::RES1c,	&Z80::RES1d,	&Z80::RES1e,
+		&Z80::RES1h,	&Z80::RES1l,	&Z80::RES1n,	&Z80::RES1a,
+		// CB90
+		&Z80::RES2b,	&Z80::RES2c,	&Z80::RES2d,	&Z80::RES2e,
+		&Z80::RES2h,	&Z80::RES2l,	&Z80::RES2n,	&Z80::RES2a,
+		&Z80::RES3b,	&Z80::RES3c,	&Z80::RES3d,	&Z80::RES3e,
+		&Z80::RES3h,	&Z80::RES3l,	&Z80::RES3n,	&Z80::RES3a,
+		// CBA0
+		&Z80::RES4b,	&Z80::RES4c,	&Z80::RES4d,	&Z80::RES4e,
+		&Z80::RES4h,	&Z80::RES4l,	&Z80::RES4n,	&Z80::RES4a,
+		&Z80::RES5b,	&Z80::RES5c,	&Z80::RES5d,	&Z80::RES5e,
+		&Z80::RES5h,	&Z80::RES5l,	&Z80::RES5n,	&Z80::RES5a,
+		// CBB0
+		&Z80::RES6b,	&Z80::RES6c,	&Z80::RES6d,	&Z80::RES6e,
+		&Z80::RES6h,	&Z80::RES6l,	&Z80::RES6n,	&Z80::RES6a,
+		&Z80::RES7b,	&Z80::RES7c,	&Z80::RES7d,	&Z80::RES7e,
+		&Z80::RES7h,	&Z80::RES7l,	&Z80::RES7n,	&Z80::RES7a,
+		// CBC0
+		&Z80::SET0b,	&Z80::SET0c,	&Z80::SET0d,	&Z80::SET0e,
+		&Z80::SET0h,	&Z80::SET0l,	&Z80::SET0n,	&Z80::SET0a,
+		&Z80::SET1b,	&Z80::SET1c,	&Z80::SET1d,	&Z80::SET1e,
+		&Z80::SET1h,	&Z80::SET1l,	&Z80::SET1n,	&Z80::SET1a,
+		// CBD0
+		&Z80::SET2b,	&Z80::SET2c,	&Z80::SET2d,	&Z80::SET2e,
+		&Z80::SET2h,	&Z80::SET2l,	&Z80::SET2n,	&Z80::SET2a,
+		&Z80::SET3b,	&Z80::SET3c,	&Z80::SET3d,	&Z80::SET3e,
+		&Z80::SET3h,	&Z80::SET3l,	&Z80::SET3n,	&Z80::SET3a,
+		// CBE0
+		&Z80::SET4b,	&Z80::SET4c,	&Z80::SET4d,	&Z80::SET4e,
+		&Z80::SET4h,	&Z80::SET4l,	&Z80::SET4n,	&Z80::SET4a,
+		&Z80::SET5b,	&Z80::SET5c,	&Z80::SET5d,	&Z80::SET5e,
+		&Z80::SET5h,	&Z80::SET5l,	&Z80::SET5n,	&Z80::SET5a,
+		// CBF0
+		&Z80::SET6b,	&Z80::SET6c,	&Z80::SET6d,	&Z80::SET6e,
+		&Z80::SET6h,	&Z80::SET6l,	&Z80::SET6n,	&Z80::SET6a,
+		&Z80::SET7b,	&Z80::SET7c,	&Z80::SET7d,	&Z80::SET7e,
+		&Z80::SET7h,	&Z80::SET7l,	&Z80::SET7n,	&Z80::SET7a,
+	};
+
 
 //////////////////////////////////////////////////
 //												//
@@ -279,482 +372,501 @@ void Z80::SWAPr_e() { _r.e=((_r.e&0xF)<<4)|((_r.e&0xF0)>>4); _r.f=_r.e?0:0x80; _
 void Z80::SWAPr_h() { _r.h=((_r.h&0xF)<<4)|((_r.h&0xF0)>>4); _r.f=_r.h?0:0x80; _r.m=2; _r.t=8; }
 void Z80::SWAPr_l() { _r.l=((_r.l&0xF)<<4)|((_r.l&0xF0)>>4); _r.f=_r.l?0:0x80; _r.m=2; _r.t=8; }
 void Z80::SWAPr_a() { _r.a=((_r.a&0xF)<<4)|((_r.a&0xF0)>>4); _r.f=_r.a?0:0x80; _r.m=2; _r.t=8; }
+void Z80::SWAPHL() { unsigned char var=_mmu->rb((_r.h<<8)+_r.l); var=((var&0xF)<<4)|((var&0xF0)>>4); _r.f=var?0:0x80; _mmu->wb((_r.h<<8)+_r.l, var); _r.m=2; _r.t=16; }
 
 /* Operacje przetwarzania danych */
 //Wszystkie operacje logiczne i arytmetyczne sa wykonywane na rejestrze A i podanym drugim rejestrze.
-void Z80::ADDr_b() { }
-void Z80::ADDr_c() { }
-void Z80::ADDr_d() { }
-void Z80::ADDr_e() { }
-void Z80::ADDr_h() { }
-void Z80::ADDr_l() { }
-void Z80::ADDr_a() { }
-void Z80::ADDHL() { }
-void Z80::ADDn() { }
-void Z80::ADDHLBC() { }
-void Z80::ADDHLDE() { }
-void Z80::ADDHLHL() { }
-void Z80::ADDHLSP() { }
-void Z80::ADDSPn() { }
+//Flagi: zero flag - 0x80, flaga po¿yczki - 0x40, flaga nadmiaru w po³owie rejestru 0x20, flaga nadmiaru - 0x10
+void Z80::ADDr_b() { unsigned short tmp=_r.a; tmp+=_r.b; _r.f=(tmp>255)?0x10:0; tmp&=255; if(!tmp) _r.f|=0x80; if((tmp^_r.b^_r.a)&0x10) _r.f|=0x20; _r.a+=_r.b; _r.m=1; _r.t=4; }
+void Z80::ADDr_c() { unsigned short tmp=_r.a; tmp+=_r.c; _r.f=(tmp>255)?0x10:0; tmp&=255; if(!tmp) _r.f|=0x80; if((tmp^_r.c^_r.a)&0x10) _r.f|=0x20; _r.a+=_r.c; _r.m=1; _r.t=4; }
+void Z80::ADDr_d() { unsigned short tmp=_r.a; tmp+=_r.d; _r.f=(tmp>255)?0x10:0; tmp&=255; if(!tmp) _r.f|=0x80; if((tmp^_r.d^_r.a)&0x10) _r.f|=0x20; _r.a+=_r.d; _r.m=1; _r.t=4; }
+void Z80::ADDr_e() { unsigned short tmp=_r.a; tmp+=_r.e; _r.f=(tmp>255)?0x10:0; tmp&=255; if(!tmp) _r.f|=0x80; if((tmp^_r.e^_r.a)&0x10) _r.f|=0x20; _r.a+=_r.e; _r.m=1; _r.t=4; }
+void Z80::ADDr_h() { unsigned short tmp=_r.a; tmp+=_r.h; _r.f=(tmp>255)?0x10:0; tmp&=255; if(!tmp) _r.f|=0x80; if((tmp^_r.h^_r.a)&0x10) _r.f|=0x20; _r.a+=_r.h; _r.m=1; _r.t=4; }
+void Z80::ADDr_l() { unsigned short tmp=_r.a; tmp+=_r.l; _r.f=(tmp>255)?0x10:0; tmp&=255; if(!tmp) _r.f|=0x80; if((tmp^_r.l^_r.a)&0x10) _r.f|=0x20; _r.a+=_r.l; _r.m=1; _r.t=4; }
+void Z80::ADDr_a() { unsigned short tmp=_r.a; tmp+=_r.a; _r.f=(tmp>255)?0x10:0; tmp&=255; if(!tmp) _r.f|=0x80; if((tmp^_r.a^_r.a)&0x10) _r.f|=0x20; _r.a+=_r.a; _r.m=1; _r.t=4; }
+void Z80::ADDHL() { unsigned short tmp=_r.a; unsigned char var=_mmu->rb((_r.h<<8)+_r.l); tmp+=var; _r.f=(tmp>255)?0x10:0; tmp&=255; if(!tmp) _r.f|=0x80; if((tmp^_r.a^var)&0x10) _r.f|=0x20; _r.a+=var; _r.m=1; _r.t = 8; }
+void Z80::ADDn() { unsigned short tmp=_r.a; unsigned char var=_mmu->rb(_r.pc); _r.pc++; tmp+=var; _r.f=(tmp>255)?0x10:0; tmp&=255; if(!tmp) _r.f|=0x80; if((tmp^_r.a^var)&0x10) _r.f|=0x20; _r.a+=var; _r.m=1; _r.t = 8; }
+void Z80::ADDHLBC() { unsigned int hl=(_r.h<<8)+_r.l; unsigned short var =(_r.b<<8)+_r.c; hl+=var; if(hl>65535) _r.f|=0x10; else _r.f&=0xEF; _r.f^=0x40; hl&=65535; if((hl^((_r.h<<8)+_r.l)^var)&0x0100) _r.f|=0x20; _r.h=(hl>>8)&255; _r.l=hl&255; _r.m=1; _r.t=8; }
+void Z80::ADDHLDE() { unsigned int hl=(_r.h<<8)+_r.l; unsigned short var =(_r.d<<8)+_r.e; hl+=var; if(hl>65535) _r.f|=0x10; else _r.f&=0xEF; _r.f^=0x40; hl&=65535; if((hl^((_r.h<<8)+_r.l)^var)&0x0100) _r.f|=0x20; _r.h=(hl>>8)&255; _r.l=hl&255; _r.m=1; _r.t=8; }
+void Z80::ADDHLHL() { unsigned int hl=(_r.h<<8)+_r.l; unsigned short var =(_r.h<<8)+_r.l; hl+=var; if(hl>65535) _r.f|=0x10; else _r.f&=0xEF; _r.f^=0x40; hl&=65535; if((hl^((_r.h<<8)+_r.l)^var)&0x0100) _r.f|=0x20; _r.h=(hl>>8)&255; _r.l=hl&255; _r.m=1; _r.t=8; }
+void Z80::ADDHLSP() { unsigned int hl=(_r.h<<8)+_r.l; unsigned short var =_r.sp; hl+=var; if(hl>65535) _r.f|=0x10; else _r.f&=0xEF; _r.f^=0x40; hl&=65535; if((hl^((_r.h<<8)+_r.l)^var)&0x0100) _r.f|=0x20; _r.h=(hl>>8)&255; _r.l=hl&255; _r.m=1; _r.t=8; }
+void Z80::ADDSPn() {  unsigned int sp = _r.sp; unsigned char var=_mmu->rb(_r.pc); _r.pc++; if(var>127) var=-((~var+1)&255); sp+=var; _r.f=(sp>65535)?0x10:0;  sp&=65535; if((sp^_r.sp^var)&0x0100) _r.f|=0x20; _r.sp=sp; _r.m=2; _r.t=16; }
 
-void Z80::ADCr_b() { }
-void Z80::ADCr_c() { }
-void Z80::ADCr_d() { }
-void Z80::ADCr_e() { }
-void Z80::ADCr_h() { }
-void Z80::ADCr_l() { }
-void Z80::ADCr_a() { }
-void Z80::ADCHL() { }
-void Z80::ADCn() { }
+void Z80::ADCr_b() { unsigned short a=_r.a; a+=_r.b; a+=(_r.f&0x10)?1:0; _r.f=(a>255)?0x10:0; a&=255; if(!a) _r.f|=0x80; if((_r.a^_r.b^a)&0x10) _r.f|=0x20; _r.a=a; _r.m=1; _r.t=4; }
+void Z80::ADCr_c() { unsigned short a=_r.a; a+=_r.c; a+=(_r.f&0x10)?1:0; _r.f=(a>255)?0x10:0; a&=255; if(!a) _r.f|=0x80; if((_r.a^_r.c^a)&0x10) _r.f|=0x20; _r.a=a; _r.m=1; _r.t=4; }
+void Z80::ADCr_d() { unsigned short a=_r.a; a+=_r.d; a+=(_r.f&0x10)?1:0; _r.f=(a>255)?0x10:0; a&=255; if(!a) _r.f|=0x80; if((_r.a^_r.d^a)&0x10) _r.f|=0x20; _r.a=a; _r.m=1; _r.t=4; }
+void Z80::ADCr_e() { unsigned short a=_r.a; a+=_r.e; a+=(_r.f&0x10)?1:0; _r.f=(a>255)?0x10:0; a&=255; if(!a) _r.f|=0x80; if((_r.a^_r.e^a)&0x10) _r.f|=0x20; _r.a=a; _r.m=1; _r.t=4; }
+void Z80::ADCr_h() { unsigned short a=_r.a; a+=_r.h; a+=(_r.f&0x10)?1:0; _r.f=(a>255)?0x10:0; a&=255; if(!a) _r.f|=0x80; if((_r.a^_r.h^a)&0x10) _r.f|=0x20; _r.a=a; _r.m=1; _r.t=4; }
+void Z80::ADCr_l() { unsigned short a=_r.a; a+=_r.l; a+=(_r.f&0x10)?1:0; _r.f=(a>255)?0x10:0; a&=255; if(!a) _r.f|=0x80; if((_r.a^_r.l^a)&0x10) _r.f|=0x20; _r.a=a; _r.m=1; _r.t=4; }
+void Z80::ADCr_a() { unsigned short a=_r.a; a+=_r.a; a+=(_r.f&0x10)?1:0; _r.f=(a>255)?0x10:0; a&=255; if(!a) _r.f|=0x80; if((_r.a^_r.a^a)&0x10) _r.f|=0x20; _r.a=a; _r.m=1; _r.t=4; }
+void Z80::ADCHL() { unsigned short a=_r.a; unsigned char var=_mmu->rb((_r.h<<8)+_r.l); a+=var; a+=(_r.f&0x10)?1:0; _r.f=(a>255)?0x10:0; a&=255; if(!a) _r.f|=0x80; if((_r.a^var^a)&0x10) _r.f|=0x20; _r.a=a; _r.m=1; _r.t=8; }
+void Z80::ADCn() { unsigned short a=_r.a; unsigned char var=_mmu->rb(_r.pc); _r.pc++; a+=var; a+=(_r.f&0x10)?1:0; _r.f=(a>255)?0x10:0; a&=255; if(!a) _r.f|=0x80; if((_r.a^var^a)&0x10) _r.f|=0x20; _r.a=a; _r.m=2; _r.t=8; }
 
-void Z80::SUBr_b() { }
-void Z80::SUBr_c() { }
-void Z80::SUBr_d() { }
-void Z80::SUBr_e() { }
-void Z80::SUBr_h() { }
-void Z80::SUBr_l() { }
-void Z80::SUBr_a() { }
-void Z80::SUBHL() { }
-void Z80::SUBn() { }
+void Z80::SUBr_b() { short a=_r.a; a-=_r.b; _r.f=(a<0)?0x50:0x40; a&=255; if(a) _r.f|=0x80; if((_r.a^_r.b^a)&0x10) _r.f|=0x20; _r.a=a; _r.m=1; _r.t=4; }
+void Z80::SUBr_c() { short a=_r.a; a-=_r.c; _r.f=(a<0)?0x50:0x40; a&=255; if(a) _r.f|=0x80; if((_r.a^_r.c^a)&0x10) _r.f|=0x20; _r.a=a; _r.m=1; _r.t=4; }
+void Z80::SUBr_d() { short a=_r.a; a-=_r.d; _r.f=(a<0)?0x50:0x40; a&=255; if(a) _r.f|=0x80; if((_r.a^_r.d^a)&0x10) _r.f|=0x20; _r.a=a; _r.m=1; _r.t=4; }
+void Z80::SUBr_e() { short a=_r.a; a-=_r.e; _r.f=(a<0)?0x50:0x40; a&=255; if(a) _r.f|=0x80; if((_r.a^_r.e^a)&0x10) _r.f|=0x20; _r.a=a; _r.m=1; _r.t=4; }
+void Z80::SUBr_h() { short a=_r.a; a-=_r.h; _r.f=(a<0)?0x50:0x40; a&=255; if(a) _r.f|=0x80; if((_r.a^_r.h^a)&0x10) _r.f|=0x20; _r.a=a; _r.m=1; _r.t=4; }
+void Z80::SUBr_l() { short a=_r.a; a-=_r.l; _r.f=(a<0)?0x50:0x40; a&=255; if(a) _r.f|=0x80; if((_r.a^_r.l^a)&0x10) _r.f|=0x20; _r.a=a; _r.m=1; _r.t=4; }
+void Z80::SUBr_a() { short a=_r.a; a-=_r.a; _r.f=(a<0)?0x50:0x40; a&=255; if(a) _r.f|=0x80; if((_r.a^_r.a^a)&0x10) _r.f|=0x20; _r.a=a; _r.m=1; _r.t=4; }
+void Z80::SUBHL() { short a=_r.a; unsigned char var=_mmu->rb((_r.h<<8)+_r.l); a-=var; _r.f=(a<0)?0x50:0x40; a&=255; if(a) _r.f|=0x80; if((_r.a^var^a)&0x10) _r.f|=0x20; _r.a=a; _r.m=1; _r.t=8; }
+void Z80::SUBn() { short a=_r.a; unsigned char var=_mmu->rb(_r.pc); _r.pc++; a-=var; _r.f=(a<0)?0x50:0x40; a&=255; if(a) _r.f|=0x80; if((_r.a^var^a)&0x10) _r.f|=0x20; _r.a=a; _r.m=2; _r.t=8; }
 
-void Z80::SBCr_b() { }
-void Z80::SBCr_c() { }
-void Z80::SBCr_d() { }
-void Z80::SBCr_e() { }
-void Z80::SBCr_h() { }
-void Z80::SBCr_l() { }
-void Z80::SBCr_a() { }
-void Z80::SBCHL() { }
-void Z80::SBCn() { }
+void Z80::SBCr_b() { short a=_r.a; a-=_r.b; a-=(_r.f&0x10)?1:0; _r.f=(a<0)?0x50:0x40; a&=255; if(!a) _r.f|=0x80; if((_r.a^_r.b^a)&0x10) _r.f|=0x20; _r.a=a; _r.m=1; _r.t=4; }
+void Z80::SBCr_c() { short a=_r.a; a-=_r.c; a-=(_r.f&0x10)?1:0; _r.f=(a<0)?0x50:0x40; a&=255; if(!a) _r.f|=0x80; if((_r.a^_r.c^a)&0x10) _r.f|=0x20; _r.a=a; _r.m=1; _r.t=4; }
+void Z80::SBCr_d() { short a=_r.a; a-=_r.d; a-=(_r.f&0x10)?1:0; _r.f=(a<0)?0x50:0x40; a&=255; if(!a) _r.f|=0x80; if((_r.a^_r.d^a)&0x10) _r.f|=0x20; _r.a=a; _r.m=1; _r.t=4; }
+void Z80::SBCr_e() { short a=_r.a; a-=_r.e; a-=(_r.f&0x10)?1:0; _r.f=(a<0)?0x50:0x40; a&=255; if(!a) _r.f|=0x80; if((_r.a^_r.e^a)&0x10) _r.f|=0x20; _r.a=a; _r.m=1; _r.t=4; }
+void Z80::SBCr_h() { short a=_r.a; a-=_r.h; a-=(_r.f&0x10)?1:0; _r.f=(a<0)?0x50:0x40; a&=255; if(!a) _r.f|=0x80; if((_r.a^_r.h^a)&0x10) _r.f|=0x20; _r.a=a; _r.m=1; _r.t=4; }
+void Z80::SBCr_l() { short a=_r.a; a-=_r.l; a-=(_r.f&0x10)?1:0; _r.f=(a<0)?0x50:0x40; a&=255; if(!a) _r.f|=0x80; if((_r.a^_r.l^a)&0x10) _r.f|=0x20; _r.a=a; _r.m=1; _r.t=4; }
+void Z80::SBCr_a() { short a=_r.a; a-=_r.a; a-=(_r.f&0x10)?1:0; _r.f=(a<0)?0x50:0x40; a&=255; if(!a) _r.f|=0x80; if((_r.a^_r.a^a)&0x10) _r.f|=0x20; _r.a=a; _r.m=1; _r.t=4; }
+void Z80::SBCHL() { short a=_r.a; unsigned char var=_mmu->rb((_r.h<<8)+_r.l); a-=var; a-=(_r.f&0x10)?1:0; _r.f=(a<0)?0x50:0x40; a&=255; if(!a) _r.f|=0x80; if((_r.a^var^a)&0x10) _r.f|=0x20; _r.a=a; _r.m=1; _r.t=8; }
+void Z80::SBCn() { short a=_r.a; unsigned char var=_mmu->rb(_r.pc); _r.pc++; a-=var; a-=(_r.f&0x10)?1:0; _r.f=(a<0)?0x50:0x40; a&=255; if(!a) _r.f|=0x80; if((_r.a^var^a)&0x10) _r.f|=0x20; _r.a=a; _r.m=2; _r.t=8; }
 
-void Z80::CPr_b() { }
-void Z80::CPr_c() { }
-void Z80::CPr_d() { }
-void Z80::CPr_e() { }
-void Z80::CPr_h() { }
-void Z80::CPr_l() { }
-void Z80::CPr_a() { }
-void Z80::CPHL() { }
-void Z80::CPn() { }
+void Z80::CPr_b() { short a=_r.a; a-=_r.b; _r.f=(a<0)?0x50:0x40; a&=255; if(!a) _r.f|=0x80; if((_r.a^_r.b^a)&0x10) _r.f|=0x20; _r.m=1; _r.t=4; }
+void Z80::CPr_c() { short a=_r.a; a-=_r.c; _r.f=(a<0)?0x50:0x40; a&=255; if(!a) _r.f|=0x80; if((_r.a^_r.c^a)&0x10) _r.f|=0x20; _r.m=1; _r.t=4; }
+void Z80::CPr_d() { short a=_r.a; a-=_r.d; _r.f=(a<0)?0x50:0x40; a&=255; if(!a) _r.f|=0x80; if((_r.a^_r.d^a)&0x10) _r.f|=0x20; _r.m=1; _r.t=4; }
+void Z80::CPr_e() { short a=_r.a; a-=_r.e; _r.f=(a<0)?0x50:0x40; a&=255; if(!a) _r.f|=0x80; if((_r.a^_r.e^a)&0x10) _r.f|=0x20; _r.m=1; _r.t=4; }
+void Z80::CPr_h() { short a=_r.a; a-=_r.h; _r.f=(a<0)?0x50:0x40; a&=255; if(!a) _r.f|=0x80; if((_r.a^_r.h^a)&0x10) _r.f|=0x20; _r.m=1; _r.t=4; }
+void Z80::CPr_l() { short a=_r.a; a-=_r.l; _r.f=(a<0)?0x50:0x40; a&=255; if(!a) _r.f|=0x80; if((_r.a^_r.l^a)&0x10) _r.f|=0x20; _r.m=1; _r.t=4; }
+void Z80::CPr_a() { short a=_r.a; a-=_r.a; _r.f=(a<0)?0x50:0x40; a&=255; if(!a) _r.f|=0x80; if((_r.a^_r.a^a)&0x10) _r.f|=0x20; _r.m=1; _r.t=4; }
+void Z80::CPHL() { short a=_r.a; unsigned char var=_mmu->rb((_r.h<<8)+_r.l); a-=var; _r.f=(a<0)?0x50:0x40; a&=255; if(a) _r.f|=0x80; if((_r.a^var^a)&0x10) _r.f|=0x20; _r.m=1; _r.t=8; }
+void Z80::CPn() { short a=_r.a; unsigned char var=_mmu->rb(_r.pc); _r.pc++; a-=var; _r.f=(a<0)?0x50:0x40; a&=255; if(a) _r.f|=0x80; if((_r.a^var^a)&0x10) _r.f|=0x20; _r.m=2; _r.t=8; }
 
-void Z80::DAA() { }
+void Z80::DAA() { unsigned char a=_r.a; if((_r.f&0x20)||((_r.a&15)>9)) _r.a+=6; _r.f&=0xEF; if((_r.f&0x20)||(a>0x99)) { _r.a+=0x60; _r.f|=0x10; } _r.m=1; _r.t=4; }
 
-void Z80::ANDr_b() { }
-void Z80::ANDr_c() { }
-void Z80::ANDr_d() { }
-void Z80::ANDr_e() { }
-void Z80::ANDr_h() { }
-void Z80::ANDr_l() { }
-void Z80::ANDr_a() { }
-void Z80::ANDHL() { }
-void Z80::ANDn() { }
+void Z80::ANDr_b() { _r.a&=_r.b; _r.f=_r.a?0x20:0xA0; _r.m=1; _r.t=4; }
+void Z80::ANDr_c() { _r.a&=_r.c; _r.f=_r.a?0x20:0xA0; _r.m=1; _r.t=4; }
+void Z80::ANDr_d() { _r.a&=_r.d; _r.f=_r.a?0x20:0xA0; _r.m=1; _r.t=4; }
+void Z80::ANDr_e() { _r.a&=_r.e; _r.f=_r.a?0x20:0xA0; _r.m=1; _r.t=4; }
+void Z80::ANDr_h() { _r.a&=_r.h; _r.f=_r.a?0x20:0xA0; _r.m=1; _r.t=4; }
+void Z80::ANDr_l() { _r.a&=_r.l; _r.f=_r.a?0x20:0xA0; _r.m=1; _r.t=4; }
+void Z80::ANDr_a() { _r.a&=_r.a; _r.f=_r.a?0x20:0xA0; _r.m=1; _r.t=4; }
+void Z80::ANDHL() { _r.a&=_mmu->rb((_r.h<<8)+_r.l); _r.f=_r.a?0x20:0xA0; _r.m=1; _r.t=8; }
+void Z80::ANDn() { _r.a&=_mmu->rb(_r.pc); _r.pc++; _r.f=_r.a?0x20:0xA0; _r.m=2; _r.t=8; }
 
-void Z80::ORr_b() { }
-void Z80::ORr_c() { }
-void Z80::ORr_d() { }
-void Z80::ORr_e() { }
-void Z80::ORr_h() { }
-void Z80::ORr_l() { }
-void Z80::ORr_a() { }
-void Z80::ORHL() { }
-void Z80::ORn() { }
+void Z80::ORr_b() { _r.a|=_r.b; _r.f=_r.a?0x00:0x80; _r.m=1; _r.t=4; }
+void Z80::ORr_c() { _r.a|=_r.c; _r.f=_r.a?0x00:0x80; _r.m=1; _r.t=4; }
+void Z80::ORr_d() { _r.a|=_r.d; _r.f=_r.a?0x00:0x80; _r.m=1; _r.t=4; }
+void Z80::ORr_e() { _r.a|=_r.e; _r.f=_r.a?0x00:0x80; _r.m=1; _r.t=4; }
+void Z80::ORr_h() { _r.a|=_r.h; _r.f=_r.a?0x00:0x80; _r.m=1; _r.t=4; }
+void Z80::ORr_l() { _r.a|=_r.l; _r.f=_r.a?0x00:0x80; _r.m=1; _r.t=4; }
+void Z80::ORr_a() { _r.a|=_r.a; _r.f=_r.a?0x00:0x80; _r.m=1; _r.t=4; }
+void Z80::ORHL() { _r.a|=_mmu->rb((_r.h<<8)+_r.l); _r.f=_r.a?0x20:0xA0; _r.m=1; _r.t=8; }
+void Z80::ORn() {  _r.a|=_mmu->rb(_r.pc); _r.pc++; _r.f=_r.a?0x20:0xA0; _r.m=2; _r.t=8; }
 
-void Z80::XORr_b() { }
-void Z80::XORr_c() { }
-void Z80::XORr_d() { }
-void Z80::XORr_e() { }
-void Z80::XORr_h() { }
-void Z80::XORr_l() { }
-void Z80::XORr_a() { }
-void Z80::XORHL() { }
-void Z80::XORn() { }
+void Z80::XORr_b() { _r.a^=_r.b; _r.f=_r.a?0x00:0x80; _r.m=1; _r.t=4; }
+void Z80::XORr_c() { _r.a^=_r.c; _r.f=_r.a?0x00:0x80; _r.m=1; _r.t=4; }
+void Z80::XORr_d() { _r.a^=_r.d; _r.f=_r.a?0x00:0x80; _r.m=1; _r.t=4; }
+void Z80::XORr_e() { _r.a^=_r.e; _r.f=_r.a?0x00:0x80; _r.m=1; _r.t=4; }
+void Z80::XORr_h() { _r.a^=_r.h; _r.f=_r.a?0x00:0x80; _r.m=1; _r.t=4; }
+void Z80::XORr_l() { _r.a^=_r.l; _r.f=_r.a?0x00:0x80; _r.m=1; _r.t=4; }
+void Z80::XORr_a() { _r.a^=_r.a; _r.f=_r.a?0x00:0x80; _r.m=1; _r.t=4; }
+void Z80::XORHL() { _r.a^=_mmu->rb((_r.h<<8)+_r.l); _r.f=_r.a?0x20:0xA0; _r.m=1; _r.t=8; }
+void Z80::XORn() {  _r.a^=_mmu->rb(_r.pc); _r.pc++; _r.f=_r.a?0x20:0xA0; _r.m=2; _r.t=8; }
 
-void Z80::INCr_b() { }
-void Z80::INCr_c() { }
-void Z80::INCr_d() { }
-void Z80::INCr_e() { }
-void Z80::INCr_h() { }
-void Z80::INCr_l() { }
-void Z80::INCr_a() { }
-void Z80::INCHLn() { }
+void Z80::INCr_b() { unsigned char var=_r.b+1; _r.f&=0x1F; _r.f|var?0:0x80; if((_r.b^0x01^var)&0x10) _r.f|=0x20; _r.m=1; _r.t=4; }
+void Z80::INCr_c() { unsigned char var=_r.c+1; _r.f&=0x1F; _r.f|var?0:0x80; if((_r.c^0x01^var)&0x10) _r.f|=0x20; _r.m=1; _r.t=4; }
+void Z80::INCr_d() { unsigned char var=_r.d+1; _r.f&=0x1F; _r.f|var?0:0x80; if((_r.d^0x01^var)&0x10) _r.f|=0x20; _r.m=1; _r.t=4; }
+void Z80::INCr_e() { unsigned char var=_r.e+1; _r.f&=0x1F; _r.f|var?0:0x80; if((_r.e^0x01^var)&0x10) _r.f|=0x20; _r.m=1; _r.t=4; }
+void Z80::INCr_h() { unsigned char var=_r.h+1; _r.f&=0x1F; _r.f|var?0:0x80; if((_r.h^0x01^var)&0x10) _r.f|=0x20; _r.m=1; _r.t=4; }
+void Z80::INCr_l() { unsigned char var=_r.l+1; _r.f&=0x1F; _r.f|var?0:0x80; if((_r.l^0x01^var)&0x10) _r.f|=0x20; _r.m=1; _r.t=4; }
+void Z80::INCr_a() { unsigned char var=_r.a+1; _r.f&=0x1F; _r.f|var?0:0x80; if((_r.a^0x01^var)&0x10) _r.f|=0x20; _r.m=1; _r.t=4; }
+void Z80::INCHLn() { unsigned char var=_mmu->rb((_r.h<<8)+_r.l); _mmu->wb((_r.h<<8)+_r.l, var+1); _r.f&=0x1F; _r.f|(var+1)?0:0x80; if((var^0x01^(var+1))&0x10) _r.f|=0x20; _r.m=1; _r.t=12; }
 
-void Z80::DECr_b() { }
-void Z80::DECr_c() { }
-void Z80::DECr_d() { }
-void Z80::DECr_e() { }
-void Z80::DECr_h() { }
-void Z80::DECr_l() { }
-void Z80::DECr_a() { }
-void Z80::DECHLn() { }
+void Z80::DECr_b() { unsigned char var=_r.b-1; _r.f|var?0x40:0xC0; if((_r.b^0x01^var)&0x10) _r.f|=0x20; _r.m=1; _r.t=4; }
+void Z80::DECr_c() { unsigned char var=_r.c-1; _r.f|var?0x40:0xC0; if((_r.c^0x01^var)&0x10) _r.f|=0x20; _r.m=1; _r.t=4; }
+void Z80::DECr_d() { unsigned char var=_r.d-1; _r.f|var?0x40:0xC0; if((_r.d^0x01^var)&0x10) _r.f|=0x20; _r.m=1; _r.t=4; }
+void Z80::DECr_e() { unsigned char var=_r.e-1; _r.f|var?0x40:0xC0; if((_r.e^0x01^var)&0x10) _r.f|=0x20; _r.m=1; _r.t=4; }
+void Z80::DECr_h() { unsigned char var=_r.h-1; _r.f|var?0x40:0xC0; if((_r.h^0x01^var)&0x10) _r.f|=0x20; _r.m=1; _r.t=4; }
+void Z80::DECr_l() { unsigned char var=_r.l-1; _r.f|var?0x40:0xC0; if((_r.l^0x01^var)&0x10) _r.f|=0x20; _r.m=1; _r.t=4; }
+void Z80::DECr_a() { unsigned char var=_r.a-1; _r.f=var?0x40:0xC0; if((_r.a^0x01^var)&0x10) _r.f|=0x20; _r.m=1; _r.t=4; }
+void Z80::DECHLn() { unsigned char var=_mmu->rb((_r.h<<8)+_r.l); _mmu->wb((_r.h<<8)+_r.l, var-1); _r.f|(var-1)?0:0x80; if((var^0x01^(var-1))&0x10) _r.f|=0x20; _r.m=1; _r.t=12; }
 
-void Z80::INCBC() { }
-void Z80::INCDE() { }
-void Z80::INCHL() { }
-void Z80::INCSP() { }
+void Z80::INCBC() { _r.c++; if(!_r.c) _r.b++; _r.m=1; _r.t=8; }
+void Z80::INCDE() { _r.e++; if(!_r.e) _r.d++; _r.m=1; _r.t=8; }
+void Z80::INCHL() { _r.l++; if(!_r.l) _r.h++; _r.m=1; _r.t=8; }
+void Z80::INCSP() { _r.sp++; _r.m=1; _r.t=8; }
 
-void Z80::DECBC() { }
-void Z80::DECDE() { }
-void Z80::DECHL() { }
-void Z80::DECSP() { }
+void Z80::DECBC() { _r.c--; if(_r.c == 255) _r.b--; _r.m=1; _r.t=8; }
+void Z80::DECDE() { _r.e--; if(_r.e == 255) _r.d--; _r.m=1; _r.t=8; }
+void Z80::DECHL() { _r.l--; if(_r.l == 255) _r.h--; _r.m=1; _r.t=8; }
+void Z80::DECSP() { _r.sp--; _r.m=1; _r.t=8; }
 
 /* Operacje manipulacji bitami */
-void Z80::BIT0b() { }
-void Z80::BIT0c() { }
-void Z80::BIT0d() { }
-void Z80::BIT0e() { }
-void Z80::BIT0h() { }
-void Z80::BIT0l() { }
-void Z80::BIT0a() { }
-void Z80::BIT0n() { }
+void Z80::BIT0b() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.b&0x01)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT0c() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.c&0x01)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT0d() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.d&0x01)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT0e() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.e&0x01)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT0h() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.h&0x01)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT0l() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.l&0x01)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT0a() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.a&0x01)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT0n() { _r.f&=0x1F; _r.f|=0x20; _r.f=((_mmu->rb((_r.h<<8)+_r.l))&0x01)?0:0x80; _r.m=2; _r.t=16; }
 
-void Z80::RES0b() { }
-void Z80::RES0c() { }
-void Z80::RES0d() { }
-void Z80::RES0e() { }
-void Z80::RES0h() { }
-void Z80::RES0l() { }
-void Z80::RES0a() { }
-void Z80::RES0n() { }
+void Z80::RES0b() { _r.b&=0xFE; _r.m=2; _r.t=8; }
+void Z80::RES0c() { _r.c&=0xFE; _r.m=2; _r.t=8; }
+void Z80::RES0d() { _r.d&=0xFE; _r.m=2; _r.t=8; }
+void Z80::RES0e() { _r.e&=0xFE; _r.m=2; _r.t=8; }
+void Z80::RES0h() { _r.h&=0xFE; _r.m=2; _r.t=8; }
+void Z80::RES0l() { _r.l&=0xFE; _r.m=2; _r.t=8; }
+void Z80::RES0a() { _r.a&=0xFE; _r.m=2; _r.t=8; }
+void Z80::RES0n() { unsigned char var=_mmu->rb((_r.h<<8)+_r.l); var&=0xFE; _mmu->wb((_r.h<<8)+_r.l, var); _r.m=2; _r.t=16; }
 
-void Z80::SET0b() { }
-void Z80::SET0c() { }
-void Z80::SET0d() { }
-void Z80::SET0e() { }
-void Z80::SET0h() { }
-void Z80::SET0l() { }
-void Z80::SET0a() { }
-void Z80::SET0n() { }
+void Z80::SET0b() { _r.b|=0x01; _r.m=2; _r.t=8; }
+void Z80::SET0c() { _r.c|=0x01; _r.m=2; _r.t=8; }
+void Z80::SET0d() { _r.d|=0x01; _r.m=2; _r.t=8; }
+void Z80::SET0e() { _r.e|=0x01; _r.m=2; _r.t=8; }
+void Z80::SET0h() { _r.h|=0x01; _r.m=2; _r.t=8; }
+void Z80::SET0l() { _r.l|=0x01; _r.m=2; _r.t=8; }
+void Z80::SET0a() { _r.a|=0x01; _r.m=2; _r.t=8; }
+void Z80::SET0n() { unsigned char var=_mmu->rb((_r.h<<8)+_r.l); var|=0x01; _mmu->wb((_r.h<<8)+_r.l, var); _r.m=2; _r.t=16; }
 
-void Z80::BIT1b() { }
-void Z80::BIT1c() { }
-void Z80::BIT1d() { }
-void Z80::BIT1e() { }
-void Z80::BIT1h() { }
-void Z80::BIT1l() { }
-void Z80::BIT1a() { }
-void Z80::BIT1n() { }
+void Z80::BIT1b() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.b&0x02)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT1c() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.c&0x02)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT1d() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.d&0x02)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT1e() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.e&0x02)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT1h() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.h&0x02)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT1l() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.l&0x02)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT1a() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.a&0x02)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT1n() { _r.f&=0x1F; _r.f|=0x20; _r.f=((_mmu->rb((_r.h<<8)+_r.l))&0x02)?0:0x80; _r.m=2; _r.t=16; }
 
-void Z80::RES1b() { }
-void Z80::RES1c() { }
-void Z80::RES1d() { }
-void Z80::RES1e() { }
-void Z80::RES1h() { }
-void Z80::RES1l() { }
-void Z80::RES1a() { }
-void Z80::RES1n() { }
+void Z80::RES1b() { _r.b&=0xFD; _r.m=2; _r.t=8; }
+void Z80::RES1c() { _r.c&=0xFD; _r.m=2; _r.t=8; }
+void Z80::RES1d() { _r.d&=0xFD; _r.m=2; _r.t=8; }
+void Z80::RES1e() { _r.e&=0xFD; _r.m=2; _r.t=8; }
+void Z80::RES1h() { _r.h&=0xFD; _r.m=2; _r.t=8; }
+void Z80::RES1l() { _r.l&=0xFD; _r.m=2; _r.t=8; }
+void Z80::RES1a() { _r.a&=0xFD; _r.m=2; _r.t=8; }
+void Z80::RES1n() { unsigned char var=_mmu->rb((_r.h<<8)+_r.l); var&=0xFD; _mmu->wb((_r.h<<8)+_r.l, var); _r.m=2; _r.t=16; }
 
-void Z80::SET1b() { }
-void Z80::SET1c() { }
-void Z80::SET1d() { }
-void Z80::SET1e() { }
-void Z80::SET1h() { }
-void Z80::SET1l() { }
-void Z80::SET1a() { }
-void Z80::SET1n() { }
+void Z80::SET1b() { _r.b|=0x02; _r.m=2; _r.t=8; }
+void Z80::SET1c() { _r.c|=0x02; _r.m=2; _r.t=8; }
+void Z80::SET1d() { _r.d|=0x02; _r.m=2; _r.t=8; }
+void Z80::SET1e() { _r.e|=0x02; _r.m=2; _r.t=8; }
+void Z80::SET1h() { _r.h|=0x02; _r.m=2; _r.t=8; }
+void Z80::SET1l() { _r.l|=0x02; _r.m=2; _r.t=8; }
+void Z80::SET1a() { _r.a|=0x02; _r.m=2; _r.t=8; }
+void Z80::SET1n() { unsigned char var=_mmu->rb((_r.h<<8)+_r.l); var|=0x02; _mmu->wb((_r.h<<8)+_r.l, var); _r.m=2; _r.t=16; }
 
-void Z80::BIT2b() { }
-void Z80::BIT2c() { }
-void Z80::BIT2d() { }
-void Z80::BIT2e() { }
-void Z80::BIT2h() { }
-void Z80::BIT2l() { }
-void Z80::BIT2a() { }
-void Z80::BIT2n() { }
+void Z80::BIT2b() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.b&0x04)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT2c() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.c&0x04)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT2d() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.d&0x04)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT2e() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.e&0x04)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT2h() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.h&0x04)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT2l() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.l&0x04)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT2a() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.a&0x04)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT2n() { _r.f&=0x1F; _r.f|=0x20; _r.f=((_mmu->rb((_r.h<<8)+_r.l))&0x04)?0:0x80; _r.m=2; _r.t=16; }
 
-void Z80::RES2b() { }
-void Z80::RES2c() { }
-void Z80::RES2d() { }
-void Z80::RES2e() { }
-void Z80::RES2h() { }
-void Z80::RES2l() { }
-void Z80::RES2a() { }
-void Z80::RES2n() { }
+void Z80::RES2b() { _r.b&=0xFB; _r.m=2; _r.t=8; }
+void Z80::RES2c() { _r.c&=0xFB; _r.m=2; _r.t=8; }
+void Z80::RES2d() { _r.d&=0xFB; _r.m=2; _r.t=8; }
+void Z80::RES2e() { _r.e&=0xFB; _r.m=2; _r.t=8; }
+void Z80::RES2h() { _r.h&=0xFB; _r.m=2; _r.t=8; }
+void Z80::RES2l() { _r.l&=0xFB; _r.m=2; _r.t=8; }
+void Z80::RES2a() { _r.a&=0xFB; _r.m=2; _r.t=8; }
+void Z80::RES2n() { unsigned char var=_mmu->rb((_r.h<<8)+_r.l); var&=0xFB; _mmu->wb((_r.h<<8)+_r.l, var); _r.m=2; _r.t=16; }
 
-void Z80::SET2b() { }
-void Z80::SET2c() { }
-void Z80::SET2d() { }
-void Z80::SET2e() { }
-void Z80::SET2h() { }
-void Z80::SET2l() { }
-void Z80::SET2a() { }
-void Z80::SET2n() { }
+void Z80::SET2b() { _r.b|=0x04; _r.m=2; _r.t=8; }
+void Z80::SET2c() { _r.c|=0x04; _r.m=2; _r.t=8; }
+void Z80::SET2d() { _r.d|=0x04; _r.m=2; _r.t=8; }
+void Z80::SET2e() { _r.e|=0x04; _r.m=2; _r.t=8; }
+void Z80::SET2h() { _r.h|=0x04; _r.m=2; _r.t=8; }
+void Z80::SET2l() { _r.l|=0x04; _r.m=2; _r.t=8; }
+void Z80::SET2a() { _r.a|=0x04; _r.m=2; _r.t=8; }
+void Z80::SET2n() { unsigned char var=_mmu->rb((_r.h<<8)+_r.l); var|=0x04; _mmu->wb((_r.h<<8)+_r.l, var); _r.m=2; _r.t=16; }
 
-void Z80::BIT3b() { }
-void Z80::BIT3c() { }
-void Z80::BIT3d() { }
-void Z80::BIT3e() { }
-void Z80::BIT3h() { }
-void Z80::BIT3l() { }
-void Z80::BIT3a() { }
-void Z80::BIT3n() { }
+void Z80::BIT3b() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.b&0x08)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT3c() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.c&0x08)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT3d() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.d&0x08)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT3e() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.e&0x08)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT3h() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.h&0x08)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT3l() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.l&0x08)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT3a() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.a&0x08)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT3n() { _r.f&=0x1F; _r.f|=0x20; _r.f=((_mmu->rb((_r.h<<8)+_r.l))&0x08)?0:0x80; _r.m=2; _r.t=16; }
 
-void Z80::RES3b() { }
-void Z80::RES3c() { }
-void Z80::RES3d() { }
-void Z80::RES3e() { }
-void Z80::RES3h() { }
-void Z80::RES3l() { }
-void Z80::RES3a() { }
-void Z80::RES3n() { }
+void Z80::RES3b() { _r.b&=0xF7; _r.m=2; _r.t=8; }
+void Z80::RES3c() { _r.c&=0xF7; _r.m=2; _r.t=8; }
+void Z80::RES3d() { _r.d&=0xF7; _r.m=2; _r.t=8; }
+void Z80::RES3e() { _r.e&=0xF7; _r.m=2; _r.t=8; }
+void Z80::RES3h() { _r.h&=0xF7; _r.m=2; _r.t=8; }
+void Z80::RES3l() { _r.l&=0xF7; _r.m=2; _r.t=8; }
+void Z80::RES3a() { _r.a&=0xF7; _r.m=2; _r.t=8; }
+void Z80::RES3n() { unsigned char var=_mmu->rb((_r.h<<8)+_r.l); var&=0xF7; _mmu->wb((_r.h<<8)+_r.l, var); _r.m=2; _r.t=16; }
 
-void Z80::SET3b() { }
-void Z80::SET3c() { }
-void Z80::SET3d() { }
-void Z80::SET3e() { }
-void Z80::SET3h() { }
-void Z80::SET3l() { }
-void Z80::SET3a() { }
-void Z80::SET3n() { }
+void Z80::SET3b() { _r.b|=0x08; _r.m=2; _r.t=8; }
+void Z80::SET3c() { _r.c|=0x08; _r.m=2; _r.t=8; }
+void Z80::SET3d() { _r.d|=0x08; _r.m=2; _r.t=8; }
+void Z80::SET3e() { _r.e|=0x08; _r.m=2; _r.t=8; }
+void Z80::SET3h() { _r.h|=0x08; _r.m=2; _r.t=8; }
+void Z80::SET3l() { _r.l|=0x08; _r.m=2; _r.t=8; }
+void Z80::SET3a() { _r.a|=0x08; _r.m=2; _r.t=8; }
+void Z80::SET3n() { unsigned char var=_mmu->rb((_r.h<<8)+_r.l); var|=0x08; _mmu->wb((_r.h<<8)+_r.l, var); _r.m=2; _r.t=16; }
 
-void Z80::BIT4b() { }
-void Z80::BIT4c() { }
-void Z80::BIT4d() { }
-void Z80::BIT4e() { }
-void Z80::BIT4h() { }
-void Z80::BIT4l() { }
-void Z80::BIT4a() { }
-void Z80::BIT4n() { }
+void Z80::BIT4b() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.b&0x10)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT4c() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.c&0x10)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT4d() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.d&0x10)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT4e() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.e&0x10)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT4h() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.h&0x10)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT4l() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.l&0x10)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT4a() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.a&0x10)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT4n() { _r.f&=0x1F; _r.f|=0x20; _r.f=((_mmu->rb((_r.h<<8)+_r.l))&0x10)?0:0x80; _r.m=2; _r.t=16; }
 
-void Z80::RES4b() { }
-void Z80::RES4c() { }
-void Z80::RES4d() { }
-void Z80::RES4e() { }
-void Z80::RES4h() { }
-void Z80::RES4l() { }
-void Z80::RES4a() { }
-void Z80::RES4n() { }
+void Z80::RES4b() { _r.b&=0xEF; _r.m=2; _r.t=8; }
+void Z80::RES4c() { _r.c&=0xEF; _r.m=2; _r.t=8; }
+void Z80::RES4d() { _r.d&=0xEF; _r.m=2; _r.t=8; }
+void Z80::RES4e() { _r.e&=0xEF; _r.m=2; _r.t=8; }
+void Z80::RES4h() { _r.h&=0xEF; _r.m=2; _r.t=8; }
+void Z80::RES4l() { _r.l&=0xEF; _r.m=2; _r.t=8; }
+void Z80::RES4a() { _r.a&=0xEF; _r.m=2; _r.t=8; }
+void Z80::RES4n() { unsigned char var=_mmu->rb((_r.h<<8)+_r.l); var&=0xEF; _mmu->wb((_r.h<<8)+_r.l, var); _r.m=2; _r.t=16; }
 
-void Z80::SET4b() { }
-void Z80::SET4c() { }
-void Z80::SET4d() { }
-void Z80::SET4e() { }
-void Z80::SET4h() { }
-void Z80::SET4l() { }
-void Z80::SET4a() { }
-void Z80::SET4n() { }
+void Z80::SET4b() { _r.b|=0x10; _r.m=2; _r.t=8; }
+void Z80::SET4c() { _r.c|=0x10; _r.m=2; _r.t=8; }
+void Z80::SET4d() { _r.d|=0x10; _r.m=2; _r.t=8; }
+void Z80::SET4e() { _r.e|=0x10; _r.m=2; _r.t=8; }
+void Z80::SET4h() { _r.h|=0x10; _r.m=2; _r.t=8; }
+void Z80::SET4l() { _r.l|=0x10; _r.m=2; _r.t=8; }
+void Z80::SET4a() { _r.a|=0x10; _r.m=2; _r.t=8; }
+void Z80::SET4n() { unsigned char var=_mmu->rb((_r.h<<8)+_r.l); var|=0x10; _mmu->wb((_r.h<<8)+_r.l, var); _r.m=2; _r.t=16; }
 
-void Z80::BIT5b() { }
-void Z80::BIT5c() { }
-void Z80::BIT5d() { }
-void Z80::BIT5e() { }
-void Z80::BIT5h() { }
-void Z80::BIT5l() { }
-void Z80::BIT5a() { }
-void Z80::BIT5n() { }
+void Z80::BIT5b() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.b&0x20)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT5c() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.c&0x20)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT5d() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.d&0x20)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT5e() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.e&0x20)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT5h() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.h&0x20)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT5l() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.l&0x20)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT5a() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.a&0x20)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT5n() { _r.f&=0x1F; _r.f|=0x20; _r.f=((_mmu->rb((_r.h<<8)+_r.l))&0x20)?0:0x80; _r.m=2; _r.t=16; }
 
-void Z80::RES5b() { }
-void Z80::RES5c() { }
-void Z80::RES5d() { }
-void Z80::RES5e() { }
-void Z80::RES5h() { }
-void Z80::RES5l() { }
-void Z80::RES5a() { }
-void Z80::RES5n() { }
+void Z80::RES5b() { _r.b&=0xDF; _r.m=2; _r.t=8; }
+void Z80::RES5c() { _r.c&=0xDF; _r.m=2; _r.t=8; }
+void Z80::RES5d() { _r.d&=0xDF; _r.m=2; _r.t=8; }
+void Z80::RES5e() { _r.e&=0xDF; _r.m=2; _r.t=8; }
+void Z80::RES5h() { _r.h&=0xDF; _r.m=2; _r.t=8; }
+void Z80::RES5l() { _r.l&=0xDF; _r.m=2; _r.t=8; }
+void Z80::RES5a() { _r.a&=0xDF; _r.m=2; _r.t=8; }
+void Z80::RES5n() { unsigned char var=_mmu->rb((_r.h<<8)+_r.l); var&=0xDF; _mmu->wb((_r.h<<8)+_r.l, var); _r.m=2; _r.t=16; }
 
-void Z80::SET5b() { }
-void Z80::SET5c() { }
-void Z80::SET5d() { }
-void Z80::SET5e() { }
-void Z80::SET5h() { }
-void Z80::SET5l() { }
-void Z80::SET5a() { }
-void Z80::SET5n() { }
+void Z80::SET5b() { _r.b|=0x20; _r.m=2; _r.t=8; }
+void Z80::SET5c() { _r.c|=0x20; _r.m=2; _r.t=8; }
+void Z80::SET5d() { _r.d|=0x20; _r.m=2; _r.t=8; }
+void Z80::SET5e() { _r.e|=0x20; _r.m=2; _r.t=8; }
+void Z80::SET5h() { _r.h|=0x20; _r.m=2; _r.t=8; }
+void Z80::SET5l() { _r.l|=0x20; _r.m=2; _r.t=8; }
+void Z80::SET5a() { _r.a|=0x20; _r.m=2; _r.t=8; }
+void Z80::SET5n() { unsigned char var=_mmu->rb((_r.h<<8)+_r.l); var|=0x20; _mmu->wb((_r.h<<8)+_r.l, var); _r.m=2; _r.t=16; }
 
-void Z80::BIT6b() { }
-void Z80::BIT6c() { }
-void Z80::BIT6d() { }
-void Z80::BIT6e() { }
-void Z80::BIT6h() { }
-void Z80::BIT6l() { }
-void Z80::BIT6a() { }
-void Z80::BIT6n() { }
+void Z80::BIT6b() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.b&0x40)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT6c() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.c&0x40)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT6d() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.d&0x40)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT6e() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.e&0x40)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT6h() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.h&0x40)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT6l() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.l&0x40)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT6a() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.a&0x40)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT6n() { _r.f&=0x1F; _r.f|=0x20; _r.f=((_mmu->rb((_r.h<<8)+_r.l))&0x40)?0:0x80; _r.m=2; _r.t=16; }
 
-void Z80::RES6b() { }
-void Z80::RES6c() { }
-void Z80::RES6d() { }
-void Z80::RES6e() { }
-void Z80::RES6h() { }
-void Z80::RES6l() { }
-void Z80::RES6a() { }
-void Z80::RES6n() { }
+void Z80::RES6b() { _r.b&=0xBF; _r.m=2; _r.t=8; }
+void Z80::RES6c() { _r.c&=0xBF; _r.m=2; _r.t=8; }
+void Z80::RES6d() { _r.d&=0xBF; _r.m=2; _r.t=8; }
+void Z80::RES6e() { _r.e&=0xBF; _r.m=2; _r.t=8; }
+void Z80::RES6h() { _r.h&=0xBF; _r.m=2; _r.t=8; }
+void Z80::RES6l() { _r.l&=0xBF; _r.m=2; _r.t=8; }
+void Z80::RES6a() { _r.a&=0xBF; _r.m=2; _r.t=8; }
+void Z80::RES6n() { unsigned char var=_mmu->rb((_r.h<<8)+_r.l); var&=0xBF; _mmu->wb((_r.h<<8)+_r.l, var); _r.m=2; _r.t=16; }
 
-void Z80::SET6b() { }
-void Z80::SET6c() { }
-void Z80::SET6d() { }
-void Z80::SET6e() { }
-void Z80::SET6h() { }
-void Z80::SET6l() { }
-void Z80::SET6a() { }
-void Z80::SET6n() { }
+void Z80::SET6b() { _r.b|=0x40; _r.m=2; _r.t=8; }
+void Z80::SET6c() { _r.c|=0x40; _r.m=2; _r.t=8; }
+void Z80::SET6d() { _r.d|=0x40; _r.m=2; _r.t=8; }
+void Z80::SET6e() { _r.e|=0x40; _r.m=2; _r.t=8; }
+void Z80::SET6h() { _r.h|=0x40; _r.m=2; _r.t=8; }
+void Z80::SET6l() { _r.l|=0x40; _r.m=2; _r.t=8; }
+void Z80::SET6a() { _r.a|=0x40; _r.m=2; _r.t=8; }
+void Z80::SET6n() { unsigned char var=_mmu->rb((_r.h<<8)+_r.l); var|=0x40; _mmu->wb((_r.h<<8)+_r.l, var); _r.m=2; _r.t=16; }
 
-void Z80::BIT7b() { }
-void Z80::BIT7c() { }
-void Z80::BIT7d() { }
-void Z80::BIT7e() { }
-void Z80::BIT7h() { }
-void Z80::BIT7l() { }
-void Z80::BIT7a() { }
-void Z80::BIT7n() { }
+void Z80::BIT7b() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.b&0x80)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT7c() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.c&0x80)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT7d() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.d&0x80)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT7e() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.e&0x80)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT7h() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.h&0x80)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT7l() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.l&0x80)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT7a() { _r.f&=0x1F; _r.f|=0x20; _r.f=(_r.a&0x80)?0:0x80; _r.m=2; _r.t=8; }
+void Z80::BIT7n() { _r.f&=0x1F; _r.f|=0x20; _r.f=((_mmu->rb((_r.h<<8)+_r.l))&0x80)?0:0x80; _r.m=2; _r.t=16; }
 
-void Z80::RES7b() { }
-void Z80::RES7c() { }
-void Z80::RES7d() { }
-void Z80::RES7e() { }
-void Z80::RES7h() { }
-void Z80::RES7l() { }
-void Z80::RES7a() { }
-void Z80::RES7n() { }
+void Z80::RES7b() { _r.b&=0x7F; _r.m=2; _r.t=8; }
+void Z80::RES7c() { _r.c&=0x7F; _r.m=2; _r.t=8; }
+void Z80::RES7d() { _r.d&=0x7F; _r.m=2; _r.t=8; }
+void Z80::RES7e() { _r.e&=0x7F; _r.m=2; _r.t=8; }
+void Z80::RES7h() { _r.h&=0x7F; _r.m=2; _r.t=8; }
+void Z80::RES7l() { _r.l&=0x7F; _r.m=2; _r.t=8; }
+void Z80::RES7a() { _r.a&=0x7F; _r.m=2; _r.t=8; }
+void Z80::RES7n() { unsigned char var=_mmu->rb((_r.h<<8)+_r.l); var&=0x7F; _mmu->wb((_r.h<<8)+_r.l, var); _r.m=2; _r.t=16; }
 
-void Z80::SET7b() { }
-void Z80::SET7c() { }
-void Z80::SET7d() { }
-void Z80::SET7e() { }
-void Z80::SET7h() { }
-void Z80::SET7l() { }
-void Z80::SET7a() { }
-void Z80::SET7n() { }
+void Z80::SET7b() { _r.b|=0x80; _r.m=2; _r.t=8; }
+void Z80::SET7c() { _r.c|=0x80; _r.m=2; _r.t=8; }
+void Z80::SET7d() { _r.d|=0x80; _r.m=2; _r.t=8; }
+void Z80::SET7e() { _r.e|=0x80; _r.m=2; _r.t=8; }
+void Z80::SET7h() { _r.h|=0x80; _r.m=2; _r.t=8; }
+void Z80::SET7l() { _r.l|=0x80; _r.m=2; _r.t=8; }
+void Z80::SET7a() { _r.a|=0x80; _r.m=2; _r.t=8; }
+void Z80::SET7n() { unsigned char var=_mmu->rb((_r.h<<8)+_r.l); var|=0x80; _mmu->wb((_r.h<<8)+_r.l, var); _r.m=2; _r.t=16; }
 
-void Z80::RLA() { }
-void Z80::RLCA() { }
-void Z80::RRA() { }
-void Z80::RRCA() { }
+void Z80::RLA() { unsigned char cf=_r.f&0x10?1:0; unsigned char overflow=_r.a&0x80?0x10:0; _r.a=(_r.a<<1)+cf; _r.f=(_r.f&0xEF)+overflow; _r.m=1; _r.t=4; }
+void Z80::RLCA() { unsigned char cf=_r.f&0x10?1:0; unsigned char overflow=_r.a&0x80?0x10:0; _r.a=(_r.a<<1)+cf; _r.f=(_r.f&0xEF)+overflow; _r.m=1; _r.t=4; }
+void Z80::RRA() { unsigned char cf=_r.f&0x10?0x80:0; unsigned char overflow=_r.a&1?0x10:0; _r.a=(_r.a>>1)+cf; _r.f=(_r.f&0xEF)+overflow; _r.m=1; _r.t=4; }
+void Z80::RRCA() { unsigned char cf=_r.a&1?0x80:0; unsigned char overflow=_r.a&1?0x10:0; _r.a=(_r.a>>1)+cf; _r.f=(_r.f&0xEF)+overflow; _r.m=1; _r.t=4; }
 
-void Z80::RLr_b() { }
-void Z80::RLr_c() { }
-void Z80::RLr_d() { }
-void Z80::RLr_e() { }
-void Z80::RLr_h() { }
-void Z80::RLr_l() { }
-void Z80::RLr_a() { }
-void Z80::RLHL() { }
+void Z80::RLr_b() { unsigned char cf=_r.f&0x10?1:0; unsigned char overflow=_r.b&0x80?0x10:0; _r.b=(_r.b<<1)+cf; _r.f=(_r.b)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::RLr_c() { unsigned char cf=_r.f&0x10?1:0; unsigned char overflow=_r.c&0x80?0x10:0; _r.c=(_r.c<<1)+cf; _r.f=(_r.c)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::RLr_d() { unsigned char cf=_r.f&0x10?1:0; unsigned char overflow=_r.d&0x80?0x10:0; _r.d=(_r.d<<1)+cf; _r.f=(_r.d)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::RLr_e() { unsigned char cf=_r.f&0x10?1:0; unsigned char overflow=_r.e&0x80?0x10:0; _r.e=(_r.e<<1)+cf; _r.f=(_r.e)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::RLr_h() { unsigned char cf=_r.f&0x10?1:0; unsigned char overflow=_r.h&0x80?0x10:0; _r.h=(_r.h<<1)+cf; _r.f=(_r.h)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::RLr_l() { unsigned char cf=_r.f&0x10?1:0; unsigned char overflow=_r.l&0x80?0x10:0; _r.l=(_r.l<<1)+cf; _r.f=(_r.l)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::RLr_a() { unsigned char cf=_r.f&0x10?1:0; unsigned char overflow=_r.a&0x80?0x10:0; _r.a=(_r.a<<1)+cf; _r.f=(_r.a)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::RLHL() { unsigned char var=_mmu->rb((_r.h<<8)+_r.l); unsigned char cf=_r.f&0x10?1:0; unsigned char overflow=var&0x80?0x10:0; var=(var<<1)+cf; _r.f=(var)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _mmu->wb((_r.h<<8)+_r.l, var); _r.m=2; _r.t=16; }
 
-void Z80::RLCr_b() { }
-void Z80::RLCr_c() { }
-void Z80::RLCr_d() { }
-void Z80::RLCr_e() { }
-void Z80::RLCr_h() { }
-void Z80::RLCr_l() { }
-void Z80::RLCr_a() { }
-void Z80::RLCHL() { }
+void Z80::RLCr_b() { unsigned char cf=_r.b&0x80?1:0; unsigned char overflow=_r.b&0x80?0x10:0; _r.b=(_r.b<<1)+cf; _r.f=(_r.b)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::RLCr_c() { unsigned char cf=_r.c&0x80?1:0; unsigned char overflow=_r.c&0x80?0x10:0; _r.c=(_r.c<<1)+cf; _r.f=(_r.c)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::RLCr_d() { unsigned char cf=_r.d&0x80?1:0; unsigned char overflow=_r.d&0x80?0x10:0; _r.d=(_r.d<<1)+cf; _r.f=(_r.d)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::RLCr_e() { unsigned char cf=_r.e&0x80?1:0; unsigned char overflow=_r.e&0x80?0x10:0; _r.e=(_r.e<<1)+cf; _r.f=(_r.e)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::RLCr_h() { unsigned char cf=_r.h&0x80?1:0; unsigned char overflow=_r.h&0x80?0x10:0; _r.h=(_r.h<<1)+cf; _r.f=(_r.h)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::RLCr_l() { unsigned char cf=_r.l&0x80?1:0; unsigned char overflow=_r.l&0x80?0x10:0; _r.l=(_r.l<<1)+cf; _r.f=(_r.l)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::RLCr_a() { unsigned char cf=_r.a&0x80?1:0; unsigned char overflow=_r.a&0x80?0x10:0; _r.a=(_r.a<<1)+cf; _r.f=(_r.a)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::RLCHL() { unsigned char var=_mmu->rb((_r.h<<8)+_r.l); unsigned char cf=var&0x80?1:0; unsigned char overflow=var&0x80?0x10:0; var=(var<<1)+cf; _r.f=(var)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _mmu->wb((_r.h<<8)+_r.l, var); _r.m=2; _r.t=16; }
 
-void Z80::RRr_b() { }
-void Z80::RRr_c() { }
-void Z80::RRr_d() { }
-void Z80::RRr_e() { }
-void Z80::RRr_h() { }
-void Z80::RRr_l() { }
-void Z80::RRr_a() { }
-void Z80::RRHL() { }
+void Z80::RRr_b() { unsigned char cf=_r.f&0x10?0x80:0; unsigned char overflow=_r.b&1?0x10:0; _r.b=(_r.b>>1)+cf; _r.f=(_r.b)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::RRr_c() { unsigned char cf=_r.f&0x10?0x80:0; unsigned char overflow=_r.c&1?0x10:0; _r.c=(_r.c>>1)+cf; _r.f=(_r.c)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::RRr_d() { unsigned char cf=_r.f&0x10?0x80:0; unsigned char overflow=_r.d&1?0x10:0; _r.d=(_r.d>>1)+cf; _r.f=(_r.d)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::RRr_e() { unsigned char cf=_r.f&0x10?0x80:0; unsigned char overflow=_r.e&1?0x10:0; _r.e=(_r.e>>1)+cf; _r.f=(_r.e)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::RRr_h() { unsigned char cf=_r.f&0x10?0x80:0; unsigned char overflow=_r.h&1?0x10:0; _r.h=(_r.h>>1)+cf; _r.f=(_r.h)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::RRr_l() { unsigned char cf=_r.f&0x10?0x80:0; unsigned char overflow=_r.l&1?0x10:0; _r.l=(_r.l>>1)+cf; _r.f=(_r.l)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::RRr_a() { unsigned char cf=_r.f&0x10?0x80:0; unsigned char overflow=_r.a&1?0x10:0; _r.a=(_r.a>>1)+cf; _r.f=(_r.a)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::RRHL() { unsigned char var=_mmu->rb((_r.h<<8)+_r.l); unsigned char cf=_r.f&0x10?0x80:0; unsigned char overflow=var&1?0x10:0; var=(var>>1)+cf; _r.f=(var)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _mmu->wb((_r.h<<8)+_r.l, var); _r.m=2; _r.t=16; }
 
-void Z80::RRCr_b() { }
-void Z80::RRCr_c() { }
-void Z80::RRCr_d() { }
-void Z80::RRCr_e() { }
-void Z80::RRCr_h() { }
-void Z80::RRCr_l() { }
-void Z80::RRCr_a() { }
-void Z80::RRCHL() { }
+void Z80::RRCr_b() { unsigned char cf=_r.b&1?0x80:0; unsigned char overflow=_r.b&1?0x10:0; _r.b=(_r.b>>1)+cf; _r.f=(_r.b)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::RRCr_c() { unsigned char cf=_r.c&1?0x80:0; unsigned char overflow=_r.c&1?0x10:0; _r.c=(_r.c>>1)+cf; _r.f=(_r.c)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::RRCr_d() { unsigned char cf=_r.d&1?0x80:0; unsigned char overflow=_r.d&1?0x10:0; _r.d=(_r.d>>1)+cf; _r.f=(_r.d)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::RRCr_e() { unsigned char cf=_r.e&1?0x80:0; unsigned char overflow=_r.e&1?0x10:0; _r.e=(_r.e>>1)+cf; _r.f=(_r.e)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::RRCr_h() { unsigned char cf=_r.h&1?0x80:0; unsigned char overflow=_r.h&1?0x10:0; _r.h=(_r.h>>1)+cf; _r.f=(_r.h)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::RRCr_l() { unsigned char cf=_r.l&1?0x80:0; unsigned char overflow=_r.l&1?0x10:0; _r.l=(_r.l>>1)+cf; _r.f=(_r.l)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::RRCr_a() { unsigned char cf=_r.a&1?0x80:0; unsigned char overflow=_r.a&1?0x10:0; _r.a=(_r.a>>1)+cf; _r.f=(_r.a)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::RRCHL() { unsigned char var=_mmu->rb((_r.h<<8)+_r.l); unsigned char cf=var&1?0x80:0; unsigned char overflow=var&1?0x10:0; var=(var>>1)+cf; _r.f=(var)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _mmu->wb((_r.h<<8)+_r.l, var); _r.m=2; _r.t=16; }
 
-void Z80::SLAr_b() { }
-void Z80::SLAr_c() { }
-void Z80::SLAr_d() { }
-void Z80::SLAr_e() { }
-void Z80::SLAr_h() { }
-void Z80::SLAr_l() { }
-void Z80::SLAr_a() { }
+void Z80::SLAr_b() { unsigned char overflow=_r.b&0x80?0x10:0; _r.b=_r.b<<1; _r.f=_r.b?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::SLAr_c() { unsigned char overflow=_r.c&0x80?0x10:0; _r.c=_r.c<<1; _r.f=_r.c?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::SLAr_d() { unsigned char overflow=_r.d&0x80?0x10:0; _r.d=_r.d<<1; _r.f=_r.d?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::SLAr_e() { unsigned char overflow=_r.e&0x80?0x10:0; _r.e=_r.e<<1; _r.f=_r.e?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::SLAr_h() { unsigned char overflow=_r.h&0x80?0x10:0; _r.h=_r.h<<1; _r.f=_r.h?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::SLAr_l() { unsigned char overflow=_r.l&0x80?0x10:0; _r.l=_r.l<<1; _r.f=_r.l?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::SLAr_a() { unsigned char overflow=_r.a&0x80?0x10:0; _r.a=_r.a<<1; _r.f=_r.a?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::SLAHL() { unsigned char var=_mmu->rb((_r.h<<8)+_r.l); unsigned char overflow=var&0x80?0x10:0; var=var<<1; _r.f=var?0:0x80; _r.f=(_r.f&0xEF)+overflow; _mmu->wb((_r.h<<8)+_r.l, var); _r.m=2; _r.t=16; }
 
-void Z80::SLLr_b() { }
-void Z80::SLLr_c() { }
-void Z80::SLLr_d() { }
-void Z80::SLLr_e() { }
-void Z80::SLLr_h() { }
-void Z80::SLLr_l() { }
-void Z80::SLLr_a() { }
+void Z80::SRAr_b() { unsigned char cf=_r.b&0x80; unsigned char overflow=_r.b&1?0x10:0; _r.b=(_r.b>>1)+cf; _r.f=_r.b?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::SRAr_c() { unsigned char cf=_r.c&0x80; unsigned char overflow=_r.c&1?0x10:0; _r.c=(_r.c>>1)+cf; _r.f=_r.c?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::SRAr_d() { unsigned char cf=_r.d&0x80; unsigned char overflow=_r.d&1?0x10:0; _r.d=(_r.d>>1)+cf; _r.f=_r.d?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::SRAr_e() { unsigned char cf=_r.e&0x80; unsigned char overflow=_r.e&1?0x10:0; _r.e=(_r.e>>1)+cf; _r.f=_r.e?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::SRAr_h() { unsigned char cf=_r.h&0x80; unsigned char overflow=_r.h&1?0x10:0; _r.h=(_r.h>>1)+cf; _r.f=_r.h?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::SRAr_l() { unsigned char cf=_r.l&0x80; unsigned char overflow=_r.l&1?0x10:0; _r.l=(_r.l>>1)+cf; _r.f=_r.l?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::SRAr_a() { unsigned char cf=_r.a&0x80; unsigned char overflow=_r.a&1?0x10:0; _r.a=(_r.a>>1)+cf; _r.f=_r.a?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::SRAHL() { unsigned char var=_mmu->rb((_r.h<<8)+_r.l); unsigned char cf=var&0x80; unsigned char overflow=var&1?0x10:0; var=(var>>1)+cf; _r.f=var?0:0x80; _r.f=(_r.f&0xEF)+overflow; _mmu->wb((_r.h<<8)+_r.l, var); _r.m=2; _r.t=16; }
 
-void Z80::SRAr_b() { }
-void Z80::SRAr_c() { }
-void Z80::SRAr_d() { }
-void Z80::SRAr_e() { }
-void Z80::SRAr_h() { }
-void Z80::SRAr_l() { }
-void Z80::SRAr_a() { }
+void Z80::SRLr_b() { unsigned char overflow=_r.b&1?0x10:0; _r.b=(_r.b>>1); _r.f=(_r.b)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::SRLr_c() { unsigned char overflow=_r.c&1?0x10:0; _r.c=(_r.c>>1); _r.f=(_r.c)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::SRLr_d() { unsigned char overflow=_r.d&1?0x10:0; _r.d=(_r.d>>1); _r.f=(_r.d)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::SRLr_e() { unsigned char overflow=_r.e&1?0x10:0; _r.e=(_r.e>>1); _r.f=(_r.e)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::SRLr_h() { unsigned char overflow=_r.h&1?0x10:0; _r.h=(_r.h>>1); _r.f=(_r.h)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::SRLr_l() { unsigned char overflow=_r.l&1?0x10:0; _r.l=(_r.l>>1); _r.f=(_r.l)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::SRLr_a() { unsigned char overflow=_r.a&1?0x10:0; _r.a=(_r.a>>1); _r.f=(_r.a)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _r.m=2; _r.t=8; }
+void Z80::SRLHL() { unsigned char var=_mmu->rb((_r.h<<8)+_r.l); unsigned char overflow=var&1?0x10:0; var=(var>>1); _r.f=(var)?0:0x80; _r.f=(_r.f&0xEF)+overflow; _mmu->wb((_r.h<<8)+_r.l, var); _r.m=2; _r.t=16; }
 
-void Z80::SRLr_b() { }
-void Z80::SRLr_c() { }
-void Z80::SRLr_d() { }
-void Z80::SRLr_e() { }
-void Z80::SRLr_h() { }
-void Z80::SRLr_l() { }
-void Z80::SRLr_a() { }
-
-void Z80::CPL() { }
-void Z80::NEG() { }
-
-void Z80::CCF() { }
-void Z80::SCF() { }
+//Logical not (Complement) na a
+void Z80::CPL() { _r.a ^= 255; _r.f&=0x60; _r.m=1; _r.t=4; }
+//Opuœæ, podnieœ CF
+void Z80::CCF() { unsigned char cf=_r.f&0x10?0:0x10; _r.f=(_r.f&0xEF)+cf; _r.m=1; _r.t=4; }
+void Z80::SCF() { _r.f&=(!_r.f&0x80)?0x90:0x10; _r.m=1; _r.t=4; }
 
 /* Operacje stosowe */
-void Z80::PUSHBC() { }
-void Z80::PUSHDE() { }
-void Z80::PUSHHL() { }
-void Z80::PUSHAF() { }
+void Z80::PUSHBC() { _r.sp--; _mmu->wb(_r.sp,_r.b); _r.sp--; _mmu->wb(_r.sp,_r.c); _r.m=1; _r.t=16; }
+void Z80::PUSHDE() { _r.sp--; _mmu->wb(_r.sp,_r.d); _r.sp--; _mmu->wb(_r.sp,_r.e); _r.m=1; _r.t=16; }
+void Z80::PUSHHL() { _r.sp--; _mmu->wb(_r.sp,_r.h); _r.sp--; _mmu->wb(_r.sp,_r.l); _r.m=1; _r.t=16; }
+void Z80::PUSHAF() { _r.sp--; _mmu->wb(_r.sp,_r.a); _r.sp--; _mmu->wb(_r.sp,_r.f); _r.m=1; _r.t=16; }
 
-void Z80::POPBC() { }
-void Z80::POPDE() { }
-void Z80::POPHL() { }
-void Z80::POPAF() { }
+void Z80::POPBC() { _r.c=_mmu->rb(_r.sp); _r.sp++; _r.b=_mmu->rb(_r.sp); _r.sp++; _r.m=1; _r.t=16; }
+void Z80::POPDE() { _r.e=_mmu->rb(_r.sp); _r.sp++; _r.d=_mmu->rb(_r.sp); _r.sp++; _r.m=1; _r.t=16; }
+void Z80::POPHL() { _r.l=_mmu->rb(_r.sp); _r.sp++; _r.h=_mmu->rb(_r.sp); _r.sp++; _r.m=1; _r.t=16; }
+void Z80::POPAF() { _r.a=_mmu->rb(_r.sp); _r.sp++; _r.f=_mmu->rb(_r.sp); _r.sp++; _r.m=1; _r.t=16; }
 
 /* Operacje skokowe */
-void Z80::JPnn() { }
-void Z80::JPHL() { }
-void Z80::JPNZnn() { }
-void Z80::JPZnn() { }
-void Z80::JPNCnn() { }
-void Z80::JPCnn() { }
+void Z80::JPnn() { _r.pc = _mmu->rw(_r.pc); _r.m=3; _r.t=16; }	
+void Z80::JPHL() { _r.pc=(_r.h<<8)+_r.l; _r.m=1; _r.t=4; }
+//Skok do lokacji gdy ostatni wynik nie by³ zerem
+void Z80::JPNZnn() { _r.t=12; if((_r.f&0x80)==0x00) { _r.pc=_mmu->rw(_r.pc); _r.t+=4; } else _r.pc+=2; _r.m=3; }
+void Z80::JPZnn() { _r.t=12; if((_r.f&0x80)==0x80) { _r.pc=_mmu->rw(_r.pc); _r.t+=4; } else _r.pc+=2; _r.m=3; }
+void Z80::JPNCnn() { _r.t=12; if((_r.f&0x10)==0x00) { _r.pc=_mmu->rw(_r.pc); _r.t+=4; } else _r.pc+=2; _r.m=3; }
+void Z80::JPCnn() { _r.t=12; if((_r.f&0x10)==0x10) { _r.pc=_mmu->rw(_r.pc); _r.t+=4; } else _r.pc+=2; _r.m=3;}
 
-void Z80::JRn() { }
-void Z80::JRNZn() { }
-void Z80::JRZn() { }
-void Z80::JRNCn() { }
-void Z80::JRCn() { }
+void Z80::JRn() { char var=_mmu->rb(_r.pc); _r.pc++; _r.pc+=var; _r.m=3; _r.t=12; }
+void Z80::JRNZn() { char var=_mmu->rb(_r.pc); _r.pc++; _r.t=8; if((_r.f&0x80)==0x00) { _r.pc+=var; _r.t+=4; } _r.m=2; }
+void Z80::JRZn() { char var=_mmu->rb(_r.pc); _r.pc++; _r.t=8; if((_r.f&0x80)==0x80) { _r.pc+=var; _r.t+=4; } _r.m=2; }
+void Z80::JRNCn() { char var=_mmu->rb(_r.pc); _r.pc++; _r.t=8; if((_r.f&0x10)==0x00) { _r.pc+=var; _r.t+=4; } _r.m=2; }
+void Z80::JRCn() { char var=_mmu->rb(_r.pc); _r.pc++; _r.t=8; if((_r.f&0x10)==0x10) { _r.pc+=var; _r.t+=4; } _r.m=2; }
 
-void Z80::DJNZn() { }
+void Z80::STOP() { _stop=1; _r.pc++; _r.m=2; _r.t=4; }
 
-void Z80::CALLnn() { }
-void Z80::CALLNZnn() { }
-void Z80::CALLZnn() { }
-void Z80::CALLNCnn() { }
-void Z80::CALLCnn() { }
+void Z80::CALLnn() { _r.sp-=2; _mmu->ww(_r.sp,_r.pc+2); _r.pc=_mmu->rw(_r.pc); _r.m=3; _r.t=24; }
+void Z80::CALLNZnn() { _r.t=12; if((_r.f&0x80)==0x00) { _r.sp-=2; _mmu->ww(_r.sp,_r.pc+2); _r.pc=_mmu->rw(_r.pc); _r.t+=12; } else _r.pc+=2; _r.m=3; }
+void Z80::CALLZnn() { _r.t=12; if((_r.f&0x80)==0x80) { _r.sp-=2; _mmu->ww(_r.sp,_r.pc+2); _r.pc=_mmu->rw(_r.pc); _r.t+=12; } else _r.pc+=2; _r.m=3; }
+void Z80::CALLNCnn() { _r.t=12; if((_r.f&0x10)==0x00) { _r.sp-=2; _mmu->ww(_r.sp,_r.pc+2); _r.pc=_mmu->rw(_r.pc); _r.t+=12; } else _r.pc+=2; _r.m=3; }
+void Z80::CALLCnn() {_r.t=12; if((_r.f&0x10)==0x10) { _r.sp-=2; _mmu->ww(_r.sp,_r.pc+2); _r.pc=_mmu->rw(_r.pc); _r.t+=12; } else _r.pc+=2; _r.m=3; }
 
-void Z80::RET() { }
-void Z80::RETI() { }
-void Z80::RETNZ() { }
-void Z80::RETZ() { }
-void Z80::RETNC() { }
-void Z80::RETC() { }
+void Z80::RET() { _r.pc=_mmu->rw(_r.sp); _r.sp+=2; _r.m=1; _r.t=16; }
+void Z80::RETI() { _r.ime=1; wczytajRejestry(); _r.pc=_mmu->rw(_r.sp); _r.sp+=2; _r.m=1; _r.t=16; }
+void Z80::RETNZ() { _r.t=8; if((_r.f&0x80)==0x00) { _r.pc=_mmu->rw(_r.sp); _r.sp+=2; _r.t+=12; } _r.m=1; }
+void Z80::RETZ() { _r.t=8; if((_r.f&0x80)==0x80) { _r.pc=_mmu->rw(_r.sp); _r.sp+=2; _r.t+=12; } _r.m=1; }
+void Z80::RETNC() { _r.t=8; if((_r.f&0x10)==0x00) { _r.pc=_mmu->rw(_r.sp); _r.sp+=2; _r.t+=12; } _r.m=1; }
+void Z80::RETC() { _r.t=8; if((_r.f&0x10)==0x10) { _r.pc=_mmu->rw(_r.sp); _r.sp+=2; _r.t+=12; } _r.m=1; }
 
-void Z80::RST00() { }
-void Z80::RST08() { }
-void Z80::RST10() { }
-void Z80::RST18() { }
-void Z80::RST20() { }
-void Z80::RST28() { }
-void Z80::RST30() { }
-void Z80::RST38() { }
-void Z80::RST40() { }
-void Z80::RST48() { }
-void Z80::RST50() { }
-void Z80::RST58() { }
-void Z80::RST60() { }
+void Z80::RST00() { zapiszRejestry(); _r.sp-=2; _mmu->ww(_r.sp,_r.pc); _r.pc=0x00; _r.m=1; _r.t=16; }
+void Z80::RST08() { zapiszRejestry(); _r.sp-=2; _mmu->ww(_r.sp,_r.pc); _r.pc=0x08; _r.m=1; _r.t=16; }
+void Z80::RST10() { zapiszRejestry(); _r.sp-=2; _mmu->ww(_r.sp,_r.pc); _r.pc=0x10; _r.m=1; _r.t=16; }
+void Z80::RST18() { zapiszRejestry(); _r.sp-=2; _mmu->ww(_r.sp,_r.pc); _r.pc=0x18; _r.m=1; _r.t=16; }
+void Z80::RST20() { zapiszRejestry(); _r.sp-=2; _mmu->ww(_r.sp,_r.pc); _r.pc=0x20; _r.m=1; _r.t=16; }
+void Z80::RST28() { zapiszRejestry(); _r.sp-=2; _mmu->ww(_r.sp,_r.pc); _r.pc=0x28; _r.m=1; _r.t=16; }
+void Z80::RST30() { zapiszRejestry(); _r.sp-=2; _mmu->ww(_r.sp,_r.pc); _r.pc=0x30; _r.m=1; _r.t=16; }
+void Z80::RST38() { zapiszRejestry(); _r.sp-=2; _mmu->ww(_r.sp,_r.pc); _r.pc=0x38; _r.m=1; _r.t=16; }
+void Z80::RST40() { zapiszRejestry(); _r.sp-=2; _mmu->ww(_r.sp,_r.pc); _r.pc=0x40; _r.m=1; _r.t=16; }
+void Z80::RST48() { zapiszRejestry(); _r.sp-=2; _mmu->ww(_r.sp,_r.pc); _r.pc=0x48; _r.m=1; _r.t=16; }
+void Z80::RST50() { zapiszRejestry(); _r.sp-=2; _mmu->ww(_r.sp,_r.pc); _r.pc=0x50; _r.m=1; _r.t=16; }
+void Z80::RST58() { zapiszRejestry(); _r.sp-=2; _mmu->ww(_r.sp,_r.pc); _r.pc=0x58; _r.m=1; _r.t=16; }
+void Z80::RST60() { zapiszRejestry(); _r.sp-=2; _mmu->ww(_r.sp,_r.pc); _r.pc=0x60; _r.m=1; _r.t=16; }
 
-void Z80::NOP() { }
-void Z80::HALT() { }
+void Z80::NOP() { _r.m=1; _r.t=4; }
+void Z80::HALT() { _halt=1; _r.m=1; _r.t=4; }
 
-void Z80::DI() { }
-void Z80::EI() { }
+//Zablokuj/odblokuj przerwania
+void Z80::DI() { _r.ime=0; _r.m=1; _r.t=4; }
+void Z80::EI() { _r.ime=1; _r.m=1; _r.t=4; }
 
 /* Domniemane puste miejsce */
-void Z80::XX() { }
+void Z80::XX() {std::cout<<"Strzal w puste miejsce!"<<std::endl; }
 
 /* Prefiks polecenia dwubajtowego, tu powinno byæ wywo³anie funkcji z tablicy dwubajtowej. */
-void Z80::MAPcb() { }
+void Z80::MAPcb() { unsigned char var=_mmu->rb(_r.pc); _r.pc++; if(_CBmap[var]) (this->*_CBmap[var])(); else std::cout<<"Blad w wejsciu CB!"<<std::endl; }
+
+/* Pomocnicze */
+
+//Zapis rejestrów w zapas
+void Z80::zapiszRejestry()
+{
+	_rsv.a = _r.a; _rsv.b = _r.b;
+	_rsv.c = _r.c; _rsv.d = _r.d;
+	_rsv.e = _r.e; _rsv.f = _r.f;
+	_rsv.h = _r.h; _rsv.l = _r.l;
+}
+
+//Wczytanie z zapasu do rejestrów
+void Z80::wczytajRejestry()
+{
+	_r.a = _rsv.a; _r.b = _rsv.b;
+	_r.c = _rsv.c; _r.d = _rsv.d;
+	_r.e = _rsv.e; _r.f = _rsv.f;
+	_r.h = _rsv.h; _r.l = _rsv.l;
+}

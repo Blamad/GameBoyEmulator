@@ -18,7 +18,13 @@ private:
 		unsigned char a, b, c, d, e, f, h, l;	//Rejestry 8 bitowe
 		unsigned short pc, sp;					//Rejestry 16b
 		unsigned char m, t;						//Rejestry zegara
-		unsigned char r;							//Na wykonywana aktualnie procedure
+		unsigned char r;						//Na wykonywana aktualnie procedure
+		bool ime;								//coœ od przerwañ, potem siê dowiem.
+	};
+
+	struct RSAV
+	{
+		unsigned char a, b, c, d, e, f, h, l;
 	};
 
 	struct Clock
@@ -29,9 +35,13 @@ private:
 	typedef void (Z80::*OpCodeMap)();
 
 	R _r;
+	RSAV _rsv;
 	Clock _clock;
 	static OpCodeMap _map[];
+	static OpCodeMap _CBmap[];
 	MMU* _mmu;
+	bool _stop;
+	bool _halt;
 
 	//////////////////////////////////////////////////
 	//												//
@@ -160,6 +170,7 @@ private:
 	void SWAPr_h();
 	void SWAPr_l();
 	void SWAPr_a();
+	void SWAPHL();
 
 	/* Operacje przetwarzania danych */
 	//Wszystkie operacje logiczne i arytmetyczne sa wykonywane na rejestrze A i podanym drugim rejestrze.
@@ -543,14 +554,7 @@ private:
 	void SLAr_h();
 	void SLAr_l();
 	void SLAr_a();
-
-	void SLLr_b();
-	void SLLr_c();
-	void SLLr_d();
-	void SLLr_e();
-	void SLLr_h();
-	void SLLr_l();
-	void SLLr_a();
+	void SLAHL();
 
 	void SRAr_b();
 	void SRAr_c();
@@ -559,6 +563,7 @@ private:
 	void SRAr_h();
 	void SRAr_l();
 	void SRAr_a();
+	void SRAHL();
 
 	void SRLr_b();
 	void SRLr_c();
@@ -567,10 +572,9 @@ private:
 	void SRLr_h();
 	void SRLr_l();
 	void SRLr_a();
+	void SRLHL();
 
 	void CPL();
-	void NEG();
-
 	void CCF();
 	void SCF();
 
@@ -599,7 +603,7 @@ private:
 	void JRNCn();
 	void JRCn();
 
-	void DJNZn();
+	void STOP();
 
 	void CALLnn();
 	void CALLNZnn();
@@ -639,6 +643,11 @@ private:
 
 	/* Prefiks polecenia dwubajtowego, tu powinno byæ wywo³anie funkcji z tablicy dwubajtowej. */
 	void MAPcb();
+	
+	/* Pomocnicze */
+	void zapiszRejestry();
+	void wczytajRejestry();
 
+	
 };
 #endif
