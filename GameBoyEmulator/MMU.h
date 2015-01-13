@@ -23,7 +23,7 @@ private:
 	vector<char> _wram; 
 	vector<char> _zram;
 
-	char _carttype;					//Typ kartidza
+	char _carttype;				
 	int _inbios;
 };
 #endif
