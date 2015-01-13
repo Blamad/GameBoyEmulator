@@ -17,7 +17,7 @@ char MMU::rb(int addr)
 
 }
 
-void MMU::wb(char byte, int addr)
+void MMU::wb(int addr, char byte)
 {
 
 }
@@ -27,7 +27,7 @@ short MMU::rw(int addr)
 
 }
 
-void MMU::ww(short word, int addr)
+void MMU::ww(int addr, short word)
 {
 
 }

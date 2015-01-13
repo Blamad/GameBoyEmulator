@@ -1,6 +1,6 @@
 
 #include "Z80.h"
-
+#include "MMU.h"
 /*
 Procek.
 Prosty schemat dzia³ania: 
@@ -12,8 +12,9 @@ Prosty schemat dzia³ania:
 			to sama sobie je pobiera i analizuje. Tutaj trzeba zaimplementowaæ wszystkie funkcje, na tym na pocz¹tku siê skupiam.)
 */
 
-Z80::Z80()
+Z80::Z80(MMU* mmu)
 {
+	_mmu = mmu;
 	init();
 }
 
@@ -28,6 +29,7 @@ void Z80::reset()
 	_r.c = 0;
 	_r.d = 0;
 	_r.e = 0;
+	_r.f = 0;
 	_r.h = 0;
 	_r.l = 0;
 	_r.pc = 0;
@@ -43,14 +45,14 @@ void Z80::reset()
 void Z80::dispatch()
 {
 	_r.r = (_r.r + 1) & 127; //tlumaczenie pobranego polecenia na kod. Nie wiem czy to dziala jak powinno, byæ mo¿e jest zbêdne.
-	(this->*_map[mmu.rb(_r.pc++)])();
+	(this->*_map[_mmu->rb(_r.pc++)])();
 	_r.pc &= 65535;
 	_clock.m += _r.m;
 }
 
 void Z80::init()
 {
-	R _r = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+	R _r = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 	Clock _clock = {0, 0};
 }
 
@@ -149,122 +151,134 @@ Z80::OpCodeMap Z80::_map[] =
 
 /* Operacje wczytywania i zapisu */
 //Z rejestru do rejestru
-void Z80::LDrr_bb() { Z80::_r.b = Z80::_r.b; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_bc() { Z80::_r.b = Z80::_r.c; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_bd() { Z80::_r.b = Z80::_r.d; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_be() { Z80::_r.b = Z80::_r.e; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_bh() { Z80::_r.b = Z80::_r.h; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_bl() { Z80::_r.b = Z80::_r.l; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_ba() { Z80::_r.b = Z80::_r.a; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_cb() { Z80::_r.c = Z80::_r.b; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_cc() { Z80::_r.c = Z80::_r.c; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_cd() { Z80::_r.c = Z80::_r.d; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_ce() { Z80::_r.c = Z80::_r.e; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_ch() { Z80::_r.c = Z80::_r.h; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_cl() { Z80::_r.c = Z80::_r.l; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_ca() { Z80::_r.c = Z80::_r.a; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_db() { Z80::_r.d = Z80::_r.b; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_dc() { Z80::_r.d = Z80::_r.c; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_dd() { Z80::_r.d = Z80::_r.d; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_de() { Z80::_r.d = Z80::_r.e; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_dh() { Z80::_r.d = Z80::_r.h; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_dl() { Z80::_r.d = Z80::_r.l; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_da() { Z80::_r.d = Z80::_r.a; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_eb() { Z80::_r.e = Z80::_r.b; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_ec() { Z80::_r.e = Z80::_r.c; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_ed() { Z80::_r.e = Z80::_r.d; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_ee() { Z80::_r.e = Z80::_r.e; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_eh() { Z80::_r.e = Z80::_r.h; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_el() { Z80::_r.e = Z80::_r.l; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_ea() { Z80::_r.e = Z80::_r.a; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_hb() { Z80::_r.h = Z80::_r.b; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_hc() { Z80::_r.h = Z80::_r.c; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_hd() { Z80::_r.h = Z80::_r.d; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_he() { Z80::_r.h = Z80::_r.e; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_hh() { Z80::_r.h = Z80::_r.h; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_hl() { Z80::_r.h = Z80::_r.l; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_ha() { Z80::_r.h = Z80::_r.a; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_lb() { Z80::_r.l = Z80::_r.b; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_lc() { Z80::_r.l = Z80::_r.c; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_ld() { Z80::_r.l = Z80::_r.d; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_le() { Z80::_r.l = Z80::_r.e; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_lh() { Z80::_r.l = Z80::_r.h; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_ll() { Z80::_r.l = Z80::_r.l; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_la() { Z80::_r.l = Z80::_r.a; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_ab() { Z80::_r.a = Z80::_r.b; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_ac() { Z80::_r.a = Z80::_r.c; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_ad() { Z80::_r.a = Z80::_r.d; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_ae() { Z80::_r.a = Z80::_r.e; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_ah() { Z80::_r.a = Z80::_r.h; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_al() { Z80::_r.a = Z80::_r.l; Z80::_r.m = 1;  Z80::_r.t = 4; }
-void Z80::LDrr_aa() { Z80::_r.a = Z80::_r.a; Z80::_r.m = 1;  Z80::_r.t = 4; }
+void Z80::LDrr_bb() { _r.b = _r.b; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_bc() { _r.b = _r.c; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_bd() { _r.b = _r.d; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_be() { _r.b = _r.e; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_bh() { _r.b = _r.h; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_bl() { _r.b = _r.l; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_ba() { _r.b = _r.a; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_cb() { _r.c = _r.b; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_cc() { _r.c = _r.c; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_cd() { _r.c = _r.d; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_ce() { _r.c = _r.e; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_ch() { _r.c = _r.h; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_cl() { _r.c = _r.l; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_ca() { _r.c = _r.a; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_db() { _r.d = _r.b; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_dc() { _r.d = _r.c; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_dd() { _r.d = _r.d; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_de() { _r.d = _r.e; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_dh() { _r.d = _r.h; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_dl() { _r.d = _r.l; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_da() { _r.d = _r.a; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_eb() { _r.e = _r.b; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_ec() { _r.e = _r.c; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_ed() { _r.e = _r.d; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_ee() { _r.e = _r.e; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_eh() { _r.e = _r.h; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_el() { _r.e = _r.l; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_ea() { _r.e = _r.a; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_hb() { _r.h = _r.b; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_hc() { _r.h = _r.c; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_hd() { _r.h = _r.d; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_he() { _r.h = _r.e; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_hh() { _r.h = _r.h; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_hl() { _r.h = _r.l; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_ha() { _r.h = _r.a; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_lb() { _r.l = _r.b; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_lc() { _r.l = _r.c; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_ld() { _r.l = _r.d; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_le() { _r.l = _r.e; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_lh() { _r.l = _r.h; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_ll() { _r.l = _r.l; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_la() { _r.l = _r.a; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_ab() { _r.a = _r.b; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_ac() { _r.a = _r.c; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_ad() { _r.a = _r.d; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_ae() { _r.a = _r.e; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_ah() { _r.a = _r.h; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_al() { _r.a = _r.l; _r.m = 1;  _r.t = 4; }
+void Z80::LDrr_aa() { _r.a = _r.a; _r.m = 1;  _r.t = 4; }
 
-//Z rejestru do adresu
-void Z80::LDrHLn_b() { }
-void Z80::LDrHLn_c() { }
-void Z80::LDrHLn_d() { }
-void Z80::LDrHLn_e() { }
-void Z80::LDrHLn_h() { }
-void Z80::LDrHLn_l() { }
-void Z80::LDrHLn_a() { }
+//Kopiuj dane spod adresu w HL do rejestru
+void Z80::LDrHLn_b() { _r.b=_mmu->rb((_r.h<<8)+_r.l); _r.m=1; _r.t=8; }
+void Z80::LDrHLn_c() { _r.c=_mmu->rb((_r.h<<8)+_r.l); _r.m=1; _r.t=8; }
+void Z80::LDrHLn_d() { _r.d=_mmu->rb((_r.h<<8)+_r.l); _r.m=1; _r.t=8; }
+void Z80::LDrHLn_e() { _r.e=_mmu->rb((_r.h<<8)+_r.l); _r.m=1; _r.t=8; }
+void Z80::LDrHLn_h() { _r.h=_mmu->rb((_r.h<<8)+_r.l); _r.m=1; _r.t=8; }
+void Z80::LDrHLn_l() { _r.l=_mmu->rb((_r.h<<8)+_r.l); _r.m=1; _r.t=8; }
+void Z80::LDrHLn_a() { _r.a=_mmu->rb((_r.h<<8)+_r.l); _r.m=1; _r.t=8; }
 
-void Z80::LDHLnr_b() { }
-void Z80::LDHLnr_c() { }
-void Z80::LDHLnr_d() { }
-void Z80::LDHLnr_e() { }
-void Z80::LDHLnr_h() { }
-void Z80::LDHLnr_l() { }
-void Z80::LDHLnr_a() { }
+//Kopiuj z rejestru do pamieci pod adresem w HL
+void Z80::LDHLnr_b() { _mmu->wb((_r.h<<8)+_r.l, _r.b); _r.m=1; _r.t=8; }
+void Z80::LDHLnr_c() { _mmu->wb((_r.h<<8)+_r.l, _r.c); _r.m=1; _r.t=8; }
+void Z80::LDHLnr_d() { _mmu->wb((_r.h<<8)+_r.l, _r.d); _r.m=1; _r.t=8; }
+void Z80::LDHLnr_e() { _mmu->wb((_r.h<<8)+_r.l, _r.e); _r.m=1; _r.t=8; }
+void Z80::LDHLnr_h() { _mmu->wb((_r.h<<8)+_r.l, _r.h); _r.m=1; _r.t=8; }
+void Z80::LDHLnr_l() { _mmu->wb((_r.h<<8)+_r.l, _r.l); _r.m=1; _r.t=8; }
+void Z80::LDHLnr_a() { _mmu->wb((_r.h<<8)+_r.l, _r.a); _r.m=1; _r.t=8; }
 
-void Z80::LDrn_b() { }
-void Z80::LDrn_c() { }
-void Z80::LDrn_d() { }
-void Z80::LDrn_e() { }
-void Z80::LDrn_h() { }
-void Z80::LDrn_l() { }
-void Z80::LDrn_a() { }
+//Pociagnij dane bezpoœrednio spod PC (program counter) do rejestru
+void Z80::LDrn_b() { _r.b=_mmu->rb(_r.pc); _r.pc++; _r.m=2; _r.t=8; }
+void Z80::LDrn_c() { _r.c=_mmu->rb(_r.pc); _r.pc++; _r.m=2; _r.t=8; }
+void Z80::LDrn_d() { _r.d=_mmu->rb(_r.pc); _r.pc++; _r.m=2; _r.t=8; }
+void Z80::LDrn_e() { _r.e=_mmu->rb(_r.pc); _r.pc++; _r.m=2; _r.t=8; }
+void Z80::LDrn_h() { _r.h=_mmu->rb(_r.pc); _r.pc++; _r.m=2; _r.t=8; }
+void Z80::LDrn_l() { _r.l=_mmu->rb(_r.pc); _r.pc++; _r.m=2; _r.t=8; }
+void Z80::LDrn_a() { _r.a=_mmu->rb(_r.pc); _r.pc++; _r.m=2; _r.t=8; }
 
-void Z80::LDHLnn() { }
+//Skopiuj bajt spod PC do pamiêci wskazywanej przez HL.
+void Z80::LDHLn() { _mmu->wb((_r.h<<8)+_r.l, _mmu->rb(_r.pc)); _r.pc++; _r.m=2; _r.t=12; }
 
-void Z80::LDBCnA() { }
-void Z80::LDDEnA() { }
+//Zapisz rejestr A pod adres wskazywany przez 16b rejestr
+void Z80::LDBCnA() { _mmu->wb((_r.b<<8)+_r.c, _r.a); _r.m=1; _r.t=8; }
+void Z80::LDDEnA() { _mmu->wb((_r.d<<8)+_r.e, _r.a); _r.m=1; _r.t=8; }
 
-void Z80::LDnnA() { }
+//Zapisz A pod adres wskazywany przez 16b adresu PC
+void Z80::LDnnA() { _mmu->wb(_mmu->rw(_r.pc), _r.a); _r.pc+=2; _r.m=3; _r.t=16; }
 
-void Z80::LDABCn() { }
-void Z80::LDADEn() { }
+//Zaladuj do A z adresu wskazywanego przez 16b rejestr
+void Z80::LDABCn() { _r.a=_mmu->rb((_r.b<<8)+_r.c); _r.m=1; _r.t=8; }
+void Z80::LDADEn() { _r.a=_mmu->rb((_r.d<<8)+_r.e); _r.m=1; _r.t=8; }
 
-void Z80::LDAnn() { }
+//Zaladuj do A z pamieci wskazywanej przez 16b adresu PC
+void Z80::LDAnn() { _r.a=_mmu->rb(_mmu->rw(_r.pc)); _r.pc+=2; _r.m=3; _r.t=16; }
 
-void Z80::LDBCnn() { }
-void Z80::LDDEnn() { }
-void Z80::LDHLnn() { }
-void Z80::LDSPnn() { }
+//Zaladuj 16 bitów spod PC do rejestru
+void Z80::LDBCnn() { _r.c=_mmu->rb(_r.pc); _r.b=_mmu->rb(_r.pc+1); _r.pc+=2; _r.m=3; _r.t=12; }
+void Z80::LDDEnn() { _r.e=_mmu->rb(_r.pc); _r.d=_mmu->rb(_r.pc+1); _r.pc+=2; _r.m=3; _r.t=12; }
+void Z80::LDHLnn() { _r.l=_mmu->rb(_r.pc); _r.h=_mmu->rb(_r.pc+1); _r.pc+=2; _r.m=3; _r.t=12; }
+void Z80::LDSPnn() { _r.sp=_mmu->rw(_r.pc); _r.pc+=2; _r.m=3; _r.t=12; }
 
-void Z80::LDHLnn() { }
-void Z80::LDnnHL() { }
+//Zaladuj z/do rejestru A z/do adresu wskazywanego przez HL i inkrementuj HL
+void Z80::LDHLIA() { _mmu->wb((_r.h<<8)+_r.l, _r.a); _r.l=(_r.l+1)&255; if(!_r.l) _r.h=(_r.h+1)&255; _r.m=1; _r.t=8; }
+void Z80::LDAHLI() { _r.a=_mmu->rb((_r.h<<8)+_r.l); _r.l=(_r.l+1)&255; if(!_r.l) _r.h=(_r.h+1)&255; _r.m=1; _r.t=8; }
 
-void Z80::LDHLIA() { }
-void Z80::LDAHLI() { }
+//jw. z dekrementacja
+void Z80::LDHLDA() { _mmu->wb((_r.h<<8)+_r.l, _r.a); _r.l=(_r.l-1)&255; if(_r.l==255) _r.h=(_r.h-1)&255; _r.m=1; _r.t = 8; }
+void Z80::LDAHLD() { _r.a=_mmu->rb((_r.h<<8)+_r.l); _r.l=(_r.l-1)&255; if(_r.l==255) _r.h=(_r.h-1)&255; _r.m=1; _r.t = 8; }
 
-void Z80::LDHLDA() { }
-void Z80::LDAHLD() { }
+//Za³aduj A z adresu wskazywanego przez (FF00 + bajt na który wskazuje PC)
+void Z80::LDAIOn() { _r.a=_mmu->rb(0xFF00+_mmu->rb(_r.pc)); _r.pc++; _r.m=2; _r.t=12; }
+//zapisz A do adresu wskazywanego przez (FF00 + bajt na który wskazuje PC)
+void Z80::LDIOnA() { _mmu->wb(0xFF00+_mmu->rb(_r.pc),_r.a); _r.pc++; _r.m=2; _r.t=12; }
+//jw, zamiast bajtu na który wskazuje PC u¿ywamy po prostu rejestru C
+void Z80::LDAIOC() { _r.a=_mmu->rb(0xFF00+_r.c); _r.m=2; _r.t=8; }
+void Z80::LDIOCA() { _mmu->wb(0xFF00+_r.c,_r.a); _r.m=2; _r.t=8; }
 
-void Z80::LDAIOn() { }
-void Z80::LDIOnA() { }
-void Z80::LDAIOC() { }
-void Z80::LDIOCA() { }
+//Dodaj bajt spod adresu w PC do wartoœci SP i wpisz wynik do HL 
+void Z80::LDHLSPn() { unsigned char i=_mmu->rb(_r.pc); if(i>127) i=-((~i+1)&255); _r.pc++; i+=_r.sp; _r.h=(i>>8)&255; _r.l=i&255; _r.m=2; _r.t=12; }
+void Z80::LDnnSP() { _mmu->wb(_mmu->rw(_r.pc), _r.sp); _r.pc+=2; _r.m=3; _r.t=20; }
 
-void Z80::LDHLSPn() { }
-void Z80::LDnnSP() { }
-
-void Z80::SWAPr_b() { }
-void Z80::SWAPr_c() { }
-void Z80::SWAPr_d() { }
-void Z80::SWAPr_e() { }
-void Z80::SWAPr_h() { }
-void Z80::SWAPr_l() { }
-void Z80::SWAPr_a() { }
+//Zamiana miejscami czesci starszej i mlodszej
+void Z80::SWAPr_b() { _r.b=((_r.b&0xF)<<4)|((_r.b&0xF0)>>4); _r.f=_r.b?0:0x80; _r.m=2; _r.t=8; }
+void Z80::SWAPr_c() { _r.c=((_r.c&0xF)<<4)|((_r.c&0xF0)>>4); _r.f=_r.c?0:0x80; _r.m=2; _r.t=8; }
+void Z80::SWAPr_d() { _r.d=((_r.d&0xF)<<4)|((_r.d&0xF0)>>4); _r.f=_r.d?0:0x80; _r.m=2; _r.t=8; }
+void Z80::SWAPr_e() { _r.e=((_r.e&0xF)<<4)|((_r.e&0xF0)>>4); _r.f=_r.e?0:0x80; _r.m=2; _r.t=8; }
+void Z80::SWAPr_h() { _r.h=((_r.h&0xF)<<4)|((_r.h&0xF0)>>4); _r.f=_r.h?0:0x80; _r.m=2; _r.t=8; }
+void Z80::SWAPr_l() { _r.l=((_r.l&0xF)<<4)|((_r.l&0xF0)>>4); _r.f=_r.l?0:0x80; _r.m=2; _r.t=8; }
+void Z80::SWAPr_a() { _r.a=((_r.a&0xF)<<4)|((_r.a&0xF0)>>4); _r.f=_r.a?0:0x80; _r.m=2; _r.t=8; }
 
 /* Operacje przetwarzania danych */
 //Wszystkie operacje logiczne i arytmetyczne sa wykonywane na rejestrze A i podanym drugim rejestrze.

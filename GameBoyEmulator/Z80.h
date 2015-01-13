@@ -7,7 +7,7 @@ class Z80
 {
 public:
 	
-	Z80();
+	Z80(MMU* mmu);
 	~Z80();
 	void init();
 	void reset();
@@ -15,10 +15,10 @@ public:
 private:
 	struct R 
 	{
-		int a, b, c, d, e, h, l,	//Rejestry 8 bitowe
-		pc, sp,						//Rejestry 16b
-		m, t,						//Rejestry zegara
-		r;							//Na wykonywana aktualnie procedure
+		unsigned char a, b, c, d, e, f, h, l;	//Rejestry 8 bitowe
+		unsigned short pc, sp;					//Rejestry 16b
+		unsigned char m, t;						//Rejestry zegara
+		unsigned char r;							//Na wykonywana aktualnie procedure
 	};
 
 	struct Clock
@@ -31,7 +31,7 @@ private:
 	R _r;
 	Clock _clock;
 	static OpCodeMap _map[];
-	MMU mmu;
+	MMU* _mmu;
 
 	//////////////////////////////////////////////////
 	//												//
@@ -119,7 +119,7 @@ private:
 	void LDrn_l();
 	void LDrn_a();
 
-	void LDHLnn();
+	void LDHLn();
 
 	void LDBCnA();
 	void LDDEnA();
