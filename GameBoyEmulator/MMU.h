@@ -10,10 +10,10 @@ class MMU
 public:
 	MMU();
 	void init();
-	char rb(int addr);				//Odczytaj bajt z adresu
-	short rw(int addr);				//Odczytaj slowo z adresu
-	void wb(char byte, int addr);	//Zapisz bajt pod adres
-	void ww(short word, int addr);	//Zapisz slowo pod adres
+	char rb(unsigned short addr);				//Odczytaj bajt z adresu
+	short rw(unsigned short addr);				//Odczytaj slowo z adresu
+	void wb(unsigned char byte, unsigned short addr);	//Zapisz bajt pod adres
+	void ww(unsigned short word, unsigned short addr);	//Zapisz slowo pod adres
 	vector<char> load(char* filename);	//Zaladowanie Romu 
 
 private:

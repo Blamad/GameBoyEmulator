@@ -28,7 +28,7 @@ void MMU::init()
 	 _bios = { };
 }
 
-char MMU::rb(int addr)
+char MMU::rb(unsigned short addr)
 {
 	switch(addr & 0xF000) 
 		{  
@@ -106,17 +106,18 @@ char MMU::rb(int addr)
 		} 
 }
 
-void MMU::wb(char byte, int addr)
+//Zapisz bajt pod adresem
+void MMU::wb(unsigned char byte, unsigned short addr)
 {
 
 }
-
-short MMU::rw(int addr)
+//Odczytaj s³owo z adresu
+short MMU::rw(unsigned short addr)
 {
 	return rb(addr) + (rb(addr+1) << 8);
 }
-
-void MMU::ww(short word, int addr)
+//Zapisz s³owo pod adresem
+void MMU::ww(unsigned short word, unsigned short addr)
 {
 
 }

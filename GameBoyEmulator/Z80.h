@@ -12,7 +12,7 @@ public:
 	void init();
 	void reset();
 	void dispatch();
-private:
+
 	struct R 
 	{
 		unsigned char a, b, c, d, e, f, h, l;	//Rejestry 8 bitowe
@@ -22,26 +22,31 @@ private:
 		bool ime;								//coœ od przerwañ, potem siê dowiem.
 	};
 
-	struct RSAV
-	{
-		unsigned char a, b, c, d, e, f, h, l;
-	};
-
 	struct Clock
 	{
 		int m, t;
 	};
 
+	Clock _clock;
+	R _r;
+
+	bool _stop;
+	bool _halt;
+
+private:
+
+
+	struct RSAV
+	{
+		unsigned char a, b, c, d, e, f, h, l;
+	};
+
 	typedef void (Z80::*OpCodeMap)();
 
-	R _r;
 	RSAV _rsv;
-	Clock _clock;
 	static OpCodeMap _map[];
 	static OpCodeMap _CBmap[];
 	MMU* _mmu;
-	bool _stop;
-	bool _halt;
 
 	//////////////////////////////////////////////////
 	//												//
