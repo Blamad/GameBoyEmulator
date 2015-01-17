@@ -1,4 +1,5 @@
 #include "MMU.h"
+#include "GPU.h"
 
 #ifndef Z80_H
 #define Z80_H
@@ -27,14 +28,13 @@ public:
 		int m, t;
 	};
 
-	Clock _clock;
-	R _r;
+	static Clock _clock;
+	static R _r;
 
 	bool _stop;
 	bool _halt;
 
 private:
-
 
 	struct RSAV
 	{
@@ -47,7 +47,8 @@ private:
 	static OpCodeMap _map[];
 	static OpCodeMap _CBmap[];
 	MMU* _mmu;
-
+	GPU* _gpu;
+	
 	//////////////////////////////////////////////////
 	//												//
 	//				Lista instrukcji				//

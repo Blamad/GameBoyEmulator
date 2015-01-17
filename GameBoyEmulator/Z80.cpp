@@ -49,10 +49,15 @@ void Z80::reset()
 
 void Z80::dispatch()
 {
-	_r.r++; //Licznik poleceñ? Po kij mi to tutaj? Mo¿e jakiœ debag czy cuœ..
-	(this->*_map[_mmu->rb(_r.pc++)])();
-	_clock.m += _r.m;
-	_clock.t += _r.t;
+	while(!_stop)
+	{
+		_r.r++; //Licznik poleceñ? Po kij mi to tutaj? Mo¿e jakiœ debag czy cuœ..
+		(this->*_map[_mmu->rb(_r.pc++)])();
+		_clock.m += _r.m;
+		_clock.t += _r.t;
+
+		_gpu->step();
+	}
 }
 
 void Z80::init()

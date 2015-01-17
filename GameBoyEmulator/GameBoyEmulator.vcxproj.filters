@@ -15,12 +15,30 @@
     <ClCompile Include="MMU.cpp">
       <Filter>Core</Filter>
     </ClCompile>
+    <ClCompile Include="GPU.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Z80.h">
       <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="MMU.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Libs\freeglut\freeglut.h">
+      <Filter>Libs</Filter>
+    </ClInclude>
+    <ClInclude Include="Libs\freeglut\freeglut_ext.h">
+      <Filter>Libs</Filter>
+    </ClInclude>
+    <ClInclude Include="Libs\freeglut\freeglut_std.h">
+      <Filter>Libs</Filter>
+    </ClInclude>
+    <ClInclude Include="Libs\freeglut\glut.h">
+      <Filter>Libs</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU.h">
       <Filter>Core</Filter>
     </ClInclude>
   </ItemGroup>

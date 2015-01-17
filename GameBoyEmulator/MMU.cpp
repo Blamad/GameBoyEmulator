@@ -109,7 +109,16 @@ char MMU::rb(unsigned short addr)
 //Zapisz bajt pod adresem
 void MMU::wb(unsigned char byte, unsigned short addr)
 {
-
+	switch(addr & 0xF000)
+	{
+		/*
+		//Musi byæ tutaj ten case, ¿eby updateowaæ moje tile z gpu!
+        case 0x9000:
+		_vram[addr & 0x1FFF] = byte;	//tablica z gpu
+		updatetile(addr); //Metoda z gpu
+		break;
+		*/
+	}
 }
 //Odczytaj s³owo z adresu
 short MMU::rw(unsigned short addr)
