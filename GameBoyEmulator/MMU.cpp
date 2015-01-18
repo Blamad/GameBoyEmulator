@@ -28,7 +28,7 @@ void MMU::init()
 	 _bios = { };
 }
 
-char MMU::rb(unsigned short addr)
+unsigned char MMU::rb(unsigned short addr)
 {
 	switch(addr & 0xF000) 
 		{  

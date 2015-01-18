@@ -78,6 +78,12 @@ GPU::GPU()
 	_line = 0;
 	_mode = 0;
 	_modeClock = 0;
+	_bgMapSet=0x1800;
+	_bgTileSet=0x0000;
+	_lcdOn=0;
+	_bgOn=0;
+	_sCX=0;
+	_sCY=0;
 
 	//Ukrycie okna konsoli
 	/*HWND hWnd = GetConsoleWindow();
@@ -107,6 +113,13 @@ GPU::GPU()
 void GPU::reset()
 {
 	//Takie tam na teraz..
+	_bgMapSet=0x1800;
+	_bgTileSet=0x0000;
+	_lcdOn=0;
+	_bgOn=0;
+	_sCX=0;
+	_sCY=0;
+	_line=0;
 
 	//Bufor od grafiki sk³ada siê z pamiêci 160x144 pikseli z których ka¿dy ma okreœlony kolor RGB.
 	//x to R, x+1 to G i x+2 to B
@@ -164,72 +177,150 @@ void GPU::updateTile(short addr)
 
 void GPU::scanLine()
 {
-	// VRAM offset for the tile map
-	int mapOffs = _bgmap ? 0x1C00 : 0x1800;
-
-	// Which line of tiles to use in the map
-	//mapoffs += ((GPU._line + GPU._scy) & 255) >> 3;
-	mapOffs += ((_line + _sCY) & 255)>>3;
-
-	// Which tile to start with in the map line
-	//var lineoffs = (GPU._scx >> 3);
-	int lineOffs = _sCX>>3;
-
-	// Which line of pixels to use in the tiles
-	//var y = (GPU._line + GPU._scy) & 7;
-	int y = (_line + _sCY)&7;
-
-	// Where in the tileline to start
-	//var x = GPU._scx & 7;
-	int x = _sCX&7;
-
-    // Read tile index from the background map
-	unsigned char color;
 	
-	//var tile
-	int tilePos = _vram[mapOffs + lineOffs];
+	if(_lcdOn)
+    {
+        if(_bgOn)
+        {
 
-	// If the tile data set in use is #1, the
-	// indices are signed; calculate a real tile offset
-	if(_bgTile == 1 && tilePos < 128) tilePos += 256;
+			int linebase = _line;
+			//int mapOffs = _bgMapSet + ((_line + _sCY) & 255)>>3;
+			int mapBase = _bgMapSet + ((((_line+_sCY)&255)>>3)<<5);
+			int y = (_line+_sCY)&7;	//ktore piksele z tile pobierac
+			int x = _sCX&7;			//gdzie zaczyna sie linia tile'a
+			int tileOffs = (_sCX>>3)&31;	//Ktory tile bede obrabial
+		
+			if(_bgTileSet)
+			{
+				int tilePos = _vram[mapBase + tileOffs];
+				if(tilePos<128) tilePos+=256;
+				for(int xPos = 0; xPos < 160; xPos++)
+				{
+					mapColorThroughPalette(_tileSet[tilePos][x][y], xPos, _line);
+					x++;
+			
+					if(x == 8)
+					{
+						x = 0;
+						tileOffs = (tileOffs + 1) & 31;
+						tilePos = _vram[mapBase + tileOffs];
+						if(tilePos < 128) 
+							tilePos += 256;
+					}
+				}
+			}
+			/*else
+			{
+				int tileRow=_tileMap[_vram[mapBase+tileOffs]][y];
+				for(int xPos = 0; xPos < 160; xPos++)
+				{
+					mapColorThroughPalette(_tileSet[tileRow][x][y], xPos, _line);
+					x++;
+					if(x==8) 
+					{ 
+						tileOffs=(tileOffs+1)&31; 
+						x=0; 
+					}
+				}
+			}*/
+		}
+	}
+}
 
-	for(int xPos = 0; xPos < 160; xPos++)
-	{
-	    // Re-map the tile pixel through the palette
-	    color=_tileSet[tilePos][x][y];
+void GPU::mapColorThroughPalette(unsigned char color, int x, int y)
+{
 		//Pociagnij kolor z tego szajsu i ustaw tu odpowiedni do wyœwietlania
-
-		switch(color)
+		switch(_palette.bg[color])
 		{
 			case 0:
-				_bufor[xPos][_line*3]=255;
-				_bufor[xPos][_line*3+1]=255;
-				_bufor[xPos][_line*3+2]=255;
+				_bufor[x][y]=255;
+				_bufor[x][y+1]=255;
+				_bufor[x][y+2]=255;
 				break;
 			case 1:
-				_bufor[xPos][_line*3]=192;
-				_bufor[xPos][_line*3+1]=192;
-				_bufor[xPos][_line*3+2]=192;
+				_bufor[x][y]=192;
+				_bufor[x][y+1]=192;
+				_bufor[x][y+2]=192;
 				break;
 			case 2:
-				_bufor[xPos][_line*3]=96;
-				_bufor[xPos][_line*3+1]=96;
-				_bufor[xPos][_line*3+2]=96;
+				_bufor[x][y]=96;
+				_bufor[x][y+1]=96;
+				_bufor[x][y+2]=96;
 				break;
 			case 3:
-				_bufor[xPos][_line*3]=0;
-				_bufor[xPos][_line*3+1]=0;
-				_bufor[xPos][_line*3+2]=0;
+				_bufor[x][y]=0;
+				_bufor[x][y+1]=0;
+				_bufor[x][y+2]=0;
 				break;
 		}
+}
 
-		x++;
-	    if(x == 8)
-	    {
-			x = 0;
-			lineOffs = (lineOffs + 1) & 31;
-			tilePos = _vram[mapOffs + lineOffs];
-			if(_bgTile && tilePos < 128) tilePos += 256;
-	    }
+unsigned char GPU::rb(unsigned short addr)
+{
+	char addrOff = addr-0xFF40;
+	switch(addrOff)
+	{
+	    // LCD Control
+	    case 0:
+	        return 
+				(_lcdOn?0x80:0)|
+				((_bgTileSet==0x0000)?0x10:0)|
+				((_bgMapSet==0x1C00)?0x08:0)|
+				//(_objSize?0x04:0)|
+				//(_objOn?0x02:0)|
+				(_bgOn?0x01:0);
+	    // Scroll Y
+	    case 2:
+	        return _sCY;
+
+	    // Scroll X
+	    case 3:
+	        return _sCX;
+
+	    // Current scanline
+	    case 4:
+	        return _line;
+	}
+}
+
+void GPU::wb(unsigned char byte, unsigned short addr)
+{
+	char addrOff = addr-0xFF40;
+	switch(addrOff)
+	{
+	    // LCD Control
+	    case 0:
+	        _lcdOn = (byte&0x80)?1:0;
+			_bgTileSet = (byte&0x10)?0x0000:0x0800;
+			_bgMapSet = (byte&0x08)?0x1C00:0x1800;
+			//_objsize = (byte&0x04)?1:0;
+			//_objon = (byte&0x02)?1:0;
+	        _bgOn = (byte&0x01)?1:0;
+
+		break;
+
+	    // Scroll Y
+	    case 2:
+	        _sCY = byte;
+		break;
+
+	    // Scroll X
+	    case 3:
+	        _sCX = byte;
+		break;
+
+	    // Background palette
+	    case 7:
+	        for(int i = 0; i < 3; i++)
+			{
+				switch((byte>>(i*2))&3)
+				{
+					case 0: _palette.bg[i] = 255; break;
+					case 1: _palette.bg[i] = 192; break;
+					case 2: _palette.bg[i] = 96; break;
+					case 3: _palette.bg[i] = 0; break;
+				}
+			}
+		break;
 	}
 }

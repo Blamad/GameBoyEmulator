@@ -10,7 +10,7 @@ class MMU
 public:
 	MMU();
 	void init();
-	char rb(unsigned short addr);				//Odczytaj bajt z adresu
+	unsigned char rb(unsigned short addr);				//Odczytaj bajt z adresu
 	short rw(unsigned short addr);				//Odczytaj slowo z adresu
 	void wb(unsigned char byte, unsigned short addr);	//Zapisz bajt pod adres
 	void ww(unsigned short word, unsigned short addr);	//Zapisz slowo pod adres
