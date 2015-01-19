@@ -1,5 +1,6 @@
 #include "MMU.h"
 #include "Z80.h"
+#include "GPU.h"
 
 #include <vector>
 #include <fstream>
@@ -13,22 +14,41 @@ TODO.
 
 */
 
-
+//-------------------------------------------------------------------------------------
 MMU::MMU()
 {
 	init();
 }
-
+//-------------------------------------------------------------------------------------
 void MMU::init()
 {
-	 _rom = load("file.GB");		  
-	 _carttype = _rom[0x0147];		
-	 _inbios = 1;
-
-	 _bios = { };
+	 _rom = load("GAME.GB");			
+	 _bios = load("BIOS.BIN");
 }
+//-------------------------------------------------------------------------------------
+void MMU::reset() 
+{
+	for(int i=0; i<8192; i++) 
+		MMU._wram[i] = 0;
+	
+	for(int i=0; i<32768; i++) 
+		MMU._eram[i] = 0;
+	
+	for(int i=0; i<127; i++) 
+		MMU._zram[i] = 0;
+	
+	MMU::_inbios = 1;
+	MMU::_ie = 0;
+	MMU::_if = 0;
+	MMU::_carttype = 0;
+	//MMU::_mbc[0] = {};
+	//MMU::_mbc[1] = {rombank:0, rambank:0, ramon:0, mode:0};
+	MMU::_romoffs = 0x4000;
+	MMU::_ramoffs = 0;
 
-unsigned char MMU::rb(unsigned short addr)
+}
+//-------------------------------------------------------------------------------------
+char MMU::rb(int addr)
 {
 	switch(addr & 0xF000) 
 		{  
@@ -41,7 +61,8 @@ unsigned char MMU::rb(unsigned short addr)
 					else if(Z80::_r.pc == 0x0100) 
 						_inbios = 0; 
 				} 
-				return _rom[addr];
+				else
+					return _rom[addr]; 
 
 			 // ROM0 
 			 case 0x1000: 
@@ -54,19 +75,19 @@ unsigned char MMU::rb(unsigned short addr)
 			case 0x5000: 
 			case 0x6000: 
 			case 0x7000: 
-				return _rom[0x4000 + (addr & 0x3FFF)]; 
+				return _rom[MMU::_romoffs + (addr & 0x3FFF)]; 
 				
-			//Zewnetrzny RAM 
+			//External RAM 
 			case 0xA000: 
 			case 0xB000: 
-				return _eram[0x0000 + (addr & 0x1FFF)]; 
+				return _eram[MMU::_ramoffs + (addr & 0x1FFF)]; 
 
-			//VRAM 
+			// Graphics: VRAM 
 			case 0x8000: 
 			case 0x9000: 
-				//return _vram[addr & 0x1FFF]; 
+				return GPU::_vram[addr & 0x1FFF]; 
 			
-			// Working RAM
+			// Working RAM 
 			case 0xC000: 
 			case 0xD000: 
 				return _wram[addr & 0x1FFF]; 
@@ -87,50 +108,206 @@ unsigned char MMU::rb(unsigned short addr)
 					case 0xC00: case 0xD00: 
 						return _wram[addr & 0x1FFF]; 
 					
-					// OAM
+					// Grafika -> OAM (Object Attribute Memory) 
 					case 0xE00: 
-						//if(addr < 0xFEA0) return _oam[addr & 0xFF]; 
-						//else return 0; 
+						//if(addr < 0xFEA0) return GPU::_oam[addr & 0xFF]; 
+						//else 
+						return 0; 
 					
 					// Zero-page 
-					case 0xF00: 
-						if(addr >= 0xFF80) { 
-							return _zram[addr & 0x7F]; 
+					case 0xF00:
+						if(addr == 0xFFFF) 
+						{ 
+							return MMU::_ie; //Interrupt enable 
 						}
-						else { 
-							// I/O
-							return 0; 
-						} 
+						else if(addr > 0xFF7F) 
+						{ 
+							return MMU::_zram[addr & 0x7F]; 
+						}
+						else switch(addr & 0xF0)
+						{
+							case 0x00:
+								switch(addr & 0xF)
+								{
+									case 0: 
+										//return KEY::rb(); // JOYP
+									case 4: case 5: case 6: case 7:
+										//return TIMER::rb(addr);
+									case 15: 
+										return MMU::_if; // Interrupt flags
+									default: 
+										return 0;
+								}
+							
+							case 0x10: case 0x20: case 0x30:
+								return 0;
+							
+							case 0x40: case 0x50: case 0x60: case 0x70:
+								return GPU::rb(addr);
+						}
 				
 				}
 		} 
 }
-
-//Zapisz bajt pod adresem
-void MMU::wb(unsigned char byte, unsigned short addr)
+//-------------------------------------------------------------------------------------
+void MMU::wb(char byte, int addr)
 {
 	switch(addr & 0xF000)
 	{
-		/*
-		//Musi byæ tutaj ten case, ¿eby updateowaæ moje tile z gpu!
-        case 0x9000:
-		_vram[addr & 0x1FFF] = byte;	//tablica z gpu
+	// ROM bank 0
+	// MBC1 -> wlaczony external RAM
+	case 0x0000: 
+	case 0x1000:
+		switch(MMU::_carttype)
+		{
+			case 1:
+			MMU::_mbc[1].ramon = ((byte & 0xF) == 0xA) ? 1 : 0;
+			break;
+		}
+		break;
+
+	// MBC1: ROM bank switch
+	case 0x2000: 
+	case 0x3000:
+		switch(_carttype)
+		{
+			case 1:
+				byte &= 0x1F;
+				if(!byte) 
+					byte = 1;
+				MMU::_mbc[1].rombank = (MMU::_mbc[1].rombank & 0x60) + byte;
+				
+				//Obliczenie offsetu ROMu
+				MMU::_romoffs = MMU::_mbc[1].rombank * 0x4000;
+				break;
+		}
+		break;
+
+	// ROM bank 1
+	// MBC1 -> RAM bank switch
+	case 0x4000: 
+	case 0x5000:
+		switch(MMU::_carttype)
+		{
+			case 1:
+				if(MMU::_mbc[1].mode)
+				{
+					MMU::_mbc[1].rambank = ( byte & 3 );
+					MMU::_ramoffs = MMU::_mbc[1].rambank * 0x2000;
+				}
+				else
+				{
+					MMU::_mbc[1].rombank = (MMU::_mbc[1].rombank & 0x1F) + ((byte & 3) << 5);
+					MMU::_romoffs = _mbc[1].rombank * 0x4000;
+				}
+		}
+		break;
+	
+	case 0x6000: 
+	case 0x7000:
+		switch(MMU::_carttype)
+		{
+			case 1:
+			MMU::_mbc[1].mode = byte & 1;
+			break;
+		}
+		break;
+	
+	// VRAM
+	case 0x8000: 
+	case 0x9000:
+		GPU::_vram[addr & 0x1FFF] = byte;
+		GPU::updateTile( addr & 0x1FFF );
+		break;
+	/*
+	case 0x9000:
+		_vram[addr & 0x1FFF] = byte; //tablica z gpu
 		updatetile(addr); //Metoda z gpu
 		break;
-		*/
+	*/
+
+	// External RAM
+	case 0xA000: 
+	case 0xB000:
+		MMU::_eram[MMU::_ramoffs + ( addr & 0x1FFF )] = byte;
+		break;
+
+	// Work RAM i echo
+	case 0xC000: 
+	case 0xD000: 
+	case 0xE000:
+		MMU::_wram[addr & 0x1FFF] = byte;
+		break;
+
+	case 0xF000:
+		switch(addr & 0x0F00)
+		{
+			// Echo RAM
+			case 0x000: case 0x100: case 0x200: case 0x300:
+			case 0x400: case 0x500: case 0x600: case 0x700:
+			case 0x800: case 0x900: case 0xA00: case 0xB00:
+			case 0xC00: case 0xD00:
+				MMU::_wram[addr & 0x1FFF] = byte;
+				break;
+		
+			// OAM
+			case 0xE00:
+				//if((addr & 0xFF) < 0xA0) GPU::_oam[addr & 0xFF] = byte;
+				//GPU::updateoam(addr - 0xFE00, byte);
+				break;
+		
+			// Zeropage RAM, I/O, interrupts
+			case 0xF00:
+				if(addr == 0xFFFF) 
+				{ 
+					MMU::_ie = byte; 
+				}
+				else if(addr > 0xFF7F) 
+				{ 
+					MMU::_zram[addr & 0x7F] = byte; 
+				}
+				else switch(addr & 0xF0) //IO
+				{
+					case 0x00:
+					switch(addr & 0xF)
+					{
+						case 0: 
+							//KEY.wb(byte); 
+							break;
+						
+						case 4: case 5: case 6: case 7: 
+							//TIMER.wb(addr, byte); 
+							break;
+						
+						case 15: 
+							MMU::_if = byte; 
+							break;
+					}
+					break;
+
+					case 0x10: case 0x20: case 0x30:
+					break;
+					
+					//GPU
+					case 0x40: case 0x50: case 0x60: case 0x70:
+					GPU::wb(addr, byte);
+					break;
+				}
+		}
+		break;
 	}
 }
-//Odczytaj s³owo z adresu
-short MMU::rw(unsigned short addr)
+//-------------------------------------------------------------------------------------
+short MMU::rw(int addr)
 {
 	return rb(addr) + (rb(addr+1) << 8);
 }
-//Zapisz s³owo pod adresem
-void MMU::ww(unsigned short word, unsigned short addr)
+//-------------------------------------------------------------------------------------
+void MMU::ww(short word, int addr)
 {
 
 }
-
+//-------------------------------------------------------------------------------------
 vector<char> MMU::load(char* filename) 
 { 	 
 	ifstream ifs(filename, ios::binary|ios::ate);
@@ -140,6 +317,9 @@ vector<char> MMU::load(char* filename)
  
 	ifs.seekg(0, ios::beg);
 	ifs.read(&result[0], pos);
-	 
+	
+	_carttype = result[0x0147];	
+
 	return result;	
 }
+//-------------------------------------------------------------------------------------
