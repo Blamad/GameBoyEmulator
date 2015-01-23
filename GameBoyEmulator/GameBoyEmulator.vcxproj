@@ -11,6 +11,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Core.cpp" />
     <ClCompile Include="GPU.cpp" />
     <ClCompile Include="MMU.cpp" />
     <ClCompile Include="Z80.cpp" />
