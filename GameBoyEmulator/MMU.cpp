@@ -29,13 +29,13 @@ void MMU::init()
 void MMU::reset() 
 {
 	for(int i=0; i<8192; i++) 
-		MMU._wram[i] = 0;
+		MMU::_wram[i] = 0;
 	
 	for(int i=0; i<32768; i++) 
-		MMU._eram[i] = 0;
+		MMU::_eram[i] = 0;
 	
 	for(int i=0; i<127; i++) 
-		MMU._zram[i] = 0;
+		MMU::_zram[i] = 0;
 	
 	MMU::_inbios = 1;
 	MMU::_ie = 0;
@@ -143,7 +143,7 @@ char MMU::rb(int addr)
 								return 0;
 							
 							case 0x40: case 0x50: case 0x60: case 0x70:
-								return GPU::rb(addr);
+								return _gpu->rb(addr);
 						}
 				
 				}
@@ -216,16 +216,10 @@ void MMU::wb(char byte, int addr)
 	// VRAM
 	case 0x8000: 
 	case 0x9000:
-		GPU::_vram[addr & 0x1FFF] = byte;
-		GPU::updateTile( addr & 0x1FFF );
+		_gpu->_vram[addr & 0x1FFF] = byte;
+		_gpu->updateTile( addr & 0x1FFF );
 		break;
-	/*
-	case 0x9000:
-		_vram[addr & 0x1FFF] = byte; //tablica z gpu
-		updatetile(addr); //Metoda z gpu
-		break;
-	*/
-
+	
 	// External RAM
 	case 0xA000: 
 	case 0xB000:
@@ -290,7 +284,7 @@ void MMU::wb(char byte, int addr)
 					
 					//GPU
 					case 0x40: case 0x50: case 0x60: case 0x70:
-					GPU::wb(addr, byte);
+					_gpu->wb(addr, byte);
 					break;
 				}
 		}

@@ -27,7 +27,7 @@ void GPU::step()
 				_modeClock = 0;
 				_mode = 0;
 
-				// Write a scanline to the framebuffer
+				// Wyrysuj linie do bufora obrazu
 				scanLine();
 			}
 			break;
@@ -45,7 +45,7 @@ void GPU::step()
 					// Enter vblank
 					_mode = 1;
 					//Wyrysuj powstaly obraz
-					draw();
+					glutPostRedisplay();
 				}
 				else
 				{
@@ -72,19 +72,26 @@ void GPU::step()
 	}
 }
 
-GPU::GPU()
+void GPU::draw()
 {
-	pixelSize = 2;
-	_line = 0;
-	_mode = 0;
-	_modeClock = 0;
-	_bgMapSet=0x1800;
-	_bgTileSet=0x0000;
-	_lcdOn=0;
-	_bgOn=0;
-	_sCX=0;
-	_sCY=0;
+	glBegin(GL_QUADS);
+	for(int xPos = 0; xPos < 160; xPos++ )
+		for(int yPos = 0; yPos < 144; yPos++ )
+		{
+			glColor3f((float)_bufor[xPos][3*yPos]/255, (float)_bufor[xPos][3*yPos+1]/255, (float)_bufor[xPos][3*yPos+2]/255); 
+			glVertex2f(xPos*pixelSize, yPos*pixelSize);
+			glVertex2f(xPos*pixelSize+pixelSize, yPos*pixelSize);
+			glVertex2f(xPos*pixelSize+pixelSize, yPos*pixelSize+pixelSize);
+			glVertex2f(xPos*pixelSize, yPos*pixelSize+pixelSize);
+		}
 
+	glEnd();
+	glutSwapBuffers();
+	glFlush();
+}
+
+void GPU::initGlut()
+{
 	//Ukrycie okna konsoli
 	/*HWND hWnd = GetConsoleWindow();
 	ShowWindow( hWnd, SW_HIDE );*/
@@ -106,8 +113,29 @@ GPU::GPU()
 	
 	glutIdleFunc(this->step);
 	glutDisplayFunc(this->draw);
-		
+	
 	glutMainLoop();
+}
+
+GPU::GPU()
+{
+	
+}
+
+void GPU::init()
+{
+	pixelSize = 2;
+	_line = 0;
+	_mode = 0;
+	_modeClock = 0;
+	_bgMapSet=0x1800;
+	_bgTileSet=0x0000;
+	_lcdOn=0;
+	_bgOn=0;
+	_sCX=0;
+	_sCY=0;
+
+	initGlut();
 }
 
 void GPU::reset()
@@ -120,6 +148,8 @@ void GPU::reset()
 	_sCX=0;
 	_sCY=0;
 	_line=0;
+	_mode=0;
+	_modeClock=0;
 
 	//Bufor od grafiki sk³ada siê z pamiêci 160x144 pikseli z których ka¿dy ma okreœlony kolor RGB.
 	//x to R, x+1 to G i x+2 to B
@@ -140,24 +170,6 @@ void GPU::reset()
 		for(int i = 0; i < 8; i++)
 			for(int j = 0; j < 8; j++)
 				_tileSet[tile][i][j] = 0;
-}
-
-void GPU::draw()
-{
-	glBegin(GL_QUADS);
-	for(int xPos = 0; xPos < 160; xPos++ )
-		for(int yPos = 0; yPos < 144; yPos++ )
-		{
-			glColor3f((float)_bufor[xPos][3*yPos]/255, (float)_bufor[xPos][3*yPos+1]/255, (float)_bufor[xPos][3*yPos+2]/255); 
-			glVertex2f(xPos*pixelSize, yPos*pixelSize);
-			glVertex2f(xPos*pixelSize+pixelSize, yPos*pixelSize);
-			glVertex2f(xPos*pixelSize+pixelSize, yPos*pixelSize+pixelSize);
-			glVertex2f(xPos*pixelSize, yPos*pixelSize+pixelSize);
-		}
-
-	glEnd();
-	glutSwapBuffers();
-	glFlush();
 }
 
 void GPU::updateTile(short addr)

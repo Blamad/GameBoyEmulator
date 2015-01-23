@@ -1,9 +1,11 @@
-#ifndef MMU_H
-#define MMU_H
-
 #include <vector>
 #include <iostream>
+#include "GPU.h"
+
 using namespace std;
+
+#ifndef MMU_H
+#define MMU_H
 
 class MMU
 {
@@ -16,6 +18,8 @@ public:
 	void wb(char byte, int addr);	//Zapisz bajt pod adres
 	void ww(short word, int addr);	//Zapisz slowo pod adres
 	vector<char> load(char* filename);	//Zaladowanie Romu 
+	
+	GPU* _gpu;
 
 private:
 	vector<char> _rom;				

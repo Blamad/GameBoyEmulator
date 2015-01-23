@@ -7,6 +7,7 @@ class GPU
 public:
 	GPU();
 	~GPU();
+	void init();
 	void draw();
 	void reset();
 	void step();
@@ -47,6 +48,7 @@ private:
 	unsigned char _bufor[160][144*3];
 	double lastTime;
 
+	void initGlut();
 	void mapColorThroughPalette(unsigned char color, int x, int y);
 };
 #endif

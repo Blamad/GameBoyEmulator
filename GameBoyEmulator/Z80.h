@@ -8,7 +8,7 @@ class Z80
 {
 public:
 	
-	Z80(MMU* mmu);
+	Z80();
 	~Z80();
 	void init();
 	void reset();
@@ -31,6 +31,9 @@ public:
 	static Clock _clock;
 	static R _r;
 
+	MMU* _mmu;
+	GPU* _gpu;
+
 	bool _stop;
 	bool _halt;
 
@@ -46,8 +49,6 @@ private:
 	RSAV _rsv;
 	static OpCodeMap _map[];
 	static OpCodeMap _CBmap[];
-	MMU* _mmu;
-	GPU* _gpu;
 	
 	//////////////////////////////////////////////////
 	//												//

@@ -13,10 +13,9 @@ Prosty schemat dzia³ania:
 			to sama sobie je pobiera i analizuje. Tutaj trzeba zaimplementowaæ wszystkie funkcje, na tym na pocz¹tku siê skupiam.)
 */
 
-Z80::Z80(MMU* mmu)
+Z80::Z80()
 {
-	_mmu = mmu;
-	init();
+	
 }
 
 Z80::~Z80()
@@ -65,8 +64,7 @@ void Z80::init()
 	R _r = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 	Clock _clock = {0, 0};
 
-	_stop = 0;
-	_halt = 0;
+	reset();
 }
 
 Z80::OpCodeMap Z80::_map[] = 
