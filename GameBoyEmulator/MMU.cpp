@@ -24,11 +24,13 @@ void MMU::init()
 {
 	 _rom = load("GAME.GB");			
 	 _bios = load("BIOS.BIN");
+
 	 reset();
 }
 //-------------------------------------------------------------------------------------
 void MMU::reset() 
 {
+
 	for(int i=0; i<8192; i++) 
 		MMU::_wram[i] = 0;
 	
@@ -39,11 +41,17 @@ void MMU::reset()
 		MMU::_zram[i] = 0;
 	
 	MMU::_inbios = 1;
+	
 	MMU::_ie = 0;
 	MMU::_if = 0;
+	
 	MMU::_carttype = 0;
-	//MMU::_mbc[0] = {};
-	//MMU::_mbc[1] = {rombank:0, rambank:0, ramon:0, mode:0};
+
+	_mbc.rombank = 0;
+	_mbc.rambank = 0;
+	_mbc.ramon = 0;
+	_mbc.mode = 0;
+
 	MMU::_romoffs = 0x4000;
 	MMU::_ramoffs = 0;
 
@@ -162,7 +170,7 @@ void MMU::wb(char byte, int addr)
 		switch(MMU::_carttype)
 		{
 			case 1:
-			MMU::_mbc[1].ramon = ((byte & 0xF) == 0xA) ? 1 : 0;
+			MMU::_mbc.ramon = ((byte & 0xF) == 0xA) ? 1 : 0;
 			break;
 		}
 		break;
@@ -176,10 +184,10 @@ void MMU::wb(char byte, int addr)
 				byte &= 0x1F;
 				if(!byte) 
 					byte = 1;
-				MMU::_mbc[1].rombank = (MMU::_mbc[1].rombank & 0x60) + byte;
+				MMU::_mbc.rombank = (MMU::_mbc.rombank & 0x60) + byte;
 				
 				//Obliczenie offsetu ROMu
-				MMU::_romoffs = MMU::_mbc[1].rombank * 0x4000;
+				MMU::_romoffs = MMU::_mbc.rombank * 0x4000;
 				break;
 		}
 		break;
@@ -191,15 +199,15 @@ void MMU::wb(char byte, int addr)
 		switch(MMU::_carttype)
 		{
 			case 1:
-				if(MMU::_mbc[1].mode)
+				if(MMU::_mbc.mode)
 				{
-					MMU::_mbc[1].rambank = ( byte & 3 );
-					MMU::_ramoffs = MMU::_mbc[1].rambank * 0x2000;
+					MMU::_mbc.rambank = ( byte & 3 );
+					MMU::_ramoffs = MMU::_mbc.rambank * 0x2000;
 				}
 				else
 				{
-					MMU::_mbc[1].rombank = (MMU::_mbc[1].rombank & 0x1F) + ((byte & 3) << 5);
-					MMU::_romoffs = _mbc[1].rombank * 0x4000;
+					MMU::_mbc.rombank = (MMU::_mbc.rombank & 0x1F) + ((byte & 3) << 5);
+					MMU::_romoffs = _mbc.rombank * 0x4000;
 				}
 		}
 		break;
@@ -209,7 +217,7 @@ void MMU::wb(char byte, int addr)
 		switch(MMU::_carttype)
 		{
 			case 1:
-			MMU::_mbc[1].mode = byte & 1;
+			MMU::_mbc.mode = byte & 1;
 			break;
 		}
 		break;
