@@ -7,9 +7,31 @@ using namespace std;
 #ifndef MMU_H
 #define MMU_H
 
+#include <vector>
+#include <iostream>
+#include "GPU.h"
+
+using namespace std;
+
+#ifndef MMU_H
+#define MMU_H
+
 class MMU
 {
 public:
+
+	struct MBC
+	{
+	
+		int rombank;
+		int rambank;
+		int ramon; 
+		bool mode;
+	
+	};
+	
+	static MBC _mbc;
+
 	MMU();
 	void init();
 	void reset();
@@ -24,7 +46,7 @@ public:
 	
 
 	GPU* _gpu;
-
+	
 private:
 	vector<char> _rom;				
 	vector<char> _eram;
@@ -38,4 +60,5 @@ private:
 	char _ramoffs;
 };
 #endif
+
 
