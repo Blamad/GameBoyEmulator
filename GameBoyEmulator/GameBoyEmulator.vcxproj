@@ -13,11 +13,13 @@
   <ItemGroup>
     <ClCompile Include="Core.cpp" />
     <ClCompile Include="GPU.cpp" />
+    <ClCompile Include="Input.cpp" />
     <ClCompile Include="MMU.cpp" />
     <ClCompile Include="Z80.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GPU.h" />
+    <ClInclude Include="Input.h" />
     <ClInclude Include="Libs\freeglut\freeglut.h" />
     <ClInclude Include="Libs\freeglut\freeglut_ext.h" />
     <ClInclude Include="Libs\freeglut\freeglut_std.h" />

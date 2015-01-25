@@ -49,7 +49,7 @@ void MMU::reset()
 
 }
 //-------------------------------------------------------------------------------------
-char MMU::rb(int addr)
+unsigned char MMU::rb(unsigned short addr)
 {
 	switch(addr & 0xF000) 
 		{  
@@ -86,7 +86,7 @@ char MMU::rb(int addr)
 			// Graphics: VRAM 
 			case 0x8000: 
 			case 0x9000: 
-				return GPU::_vram[addr & 0x1FFF]; 
+				return _gpu->_vram[addr & 0x1FFF]; 
 			
 			// Working RAM 
 			case 0xC000: 
@@ -151,7 +151,7 @@ char MMU::rb(int addr)
 		} 
 }
 //-------------------------------------------------------------------------------------
-void MMU::wb(char byte, int addr)
+void MMU::wb(unsigned char byte, unsigned short addr)
 {
 	switch(addr & 0xF000)
 	{
@@ -247,8 +247,8 @@ void MMU::wb(char byte, int addr)
 		
 			// OAM
 			case 0xE00:
-				//if((addr & 0xFF) < 0xA0) GPU::_oam[addr & 0xFF] = byte;
-				//GPU::updateoam(addr - 0xFE00, byte);
+				if((addr & 0xFF) < 0xA0) _gpu->_oam[addr & 0xFF] = byte;
+				_gpu->updateObjData(addr, byte); //tak ma zostać
 				break;
 		
 			// Zeropage RAM, I/O, interrupts
@@ -293,12 +293,12 @@ void MMU::wb(char byte, int addr)
 	}
 }
 //-------------------------------------------------------------------------------------
-short MMU::rw(int addr)
+unsigned short MMU::rw(unsigned short addr)
 {
 	return rb(addr) + (rb(addr+1) << 8);
 }
 //-------------------------------------------------------------------------------------
-void MMU::ww(short word, int addr)
+void MMU::ww(unsigned short word, unsigned short addr)
 {
 
 }

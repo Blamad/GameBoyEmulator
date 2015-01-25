@@ -10,9 +10,9 @@ public:
 	
 	Z80();
 	~Z80();
-	void init();
-	void reset();
-	void dispatch();
+	
+	MMU* _mmu;
+	GPU* _gpu;
 
 	struct R 
 	{
@@ -31,11 +31,12 @@ public:
 	static Clock _clock;
 	static R _r;
 
-	MMU* _mmu;
-	GPU* _gpu;
-
 	bool _stop;
 	bool _halt;
+
+	void init();
+	void reset();
+	void dispatch();	
 
 private:
 

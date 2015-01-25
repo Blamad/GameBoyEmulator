@@ -50,12 +50,26 @@ void Z80::dispatch()
 {
 	while(!_stop)
 	{
-		_r.r++; //Licznik poleceñ? Po kij mi to tutaj? Mo¿e jakiœ debag czy cuœ..
 		(this->*_map[_mmu->rb(_r.pc++)])();
 		_clock.m += _r.m;
 		_clock.t += _r.t;
 
 		_gpu->step();
+
+		if(_r.ime && _mmu->_ie && _mmu->_if)
+		{
+			// Mask off ints that aren't enabled
+			unsigned char ifired = _mmu->_ie & _mmu->_if;
+
+			if(ifired & 0x01)
+			{
+				_mmu->_if &= (255 - 0x01);
+				RST40();
+			}
+
+			_clock.m += _r.m;
+			_clock.t += _r.t;
+		}
 	}
 }
 

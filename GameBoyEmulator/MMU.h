@@ -13,12 +13,16 @@ public:
 	MMU();
 	void init();
 	void reset();
-	char rb(int addr);				//Odczytaj bajt z adresu
-	short rw(int addr);				//Odczytaj slowo z adresu
-	void wb(char byte, int addr);	//Zapisz bajt pod adres
-	void ww(short word, int addr);	//Zapisz slowo pod adres
-	vector<char> load(char* filename);	//Zaladowanie Romu 
+	unsigned char rb(unsigned short addr);				//Odczytaj bajt z adresu
+	unsigned short rw(unsigned short addr);				//Odczytaj slowo z adresu
+	void wb(unsigned char byte, unsigned short addr);	//Zapisz bajt pod adres
+	void ww(unsigned short word, unsigned short addr);	//Zapisz slowo pod adres
+	vector<char> load(char* filename);					//Zaladowanie Romu 
 	
+	unsigned short _ie;					//Interrupt enable (Lokacja w pamieci: FFFF) 
+	unsigned short _if;					//Interrupt flags (Lokacja w pamieci: FF0F) 
+	
+
 	GPU* _gpu;
 
 private:
@@ -30,8 +34,6 @@ private:
 
 	char _carttype;				
 	int _inbios;
-	int _ie;					//Interrupt enable (Lokacja w pamieci: FFFF) 
-	int _if;					//Interrupt flags (Lokacja w pamieci: FF0F) 
 	char _romoffs;
 	char _ramoffs;
 };

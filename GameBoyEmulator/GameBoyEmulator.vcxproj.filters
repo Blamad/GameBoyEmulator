@@ -21,6 +21,9 @@
     <ClCompile Include="Core.cpp">
       <Filter>Core</Filter>
     </ClCompile>
+    <ClCompile Include="Input.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Z80.h">
@@ -42,6 +45,9 @@
       <Filter>Libs</Filter>
     </ClInclude>
     <ClInclude Include="GPU.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Input.h">
       <Filter>Core</Filter>
     </ClInclude>
   </ItemGroup>
