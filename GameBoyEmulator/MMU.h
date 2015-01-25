@@ -1,15 +1,7 @@
 #include <vector>
 #include <iostream>
 #include "GPU.h"
-
-using namespace std;
-
-#ifndef MMU_H
-#define MMU_H
-
-#include <vector>
-#include <iostream>
-#include "GPU.h"
+#include "Input.h"
 
 using namespace std;
 
@@ -46,7 +38,8 @@ public:
 	
 
 	GPU* _gpu;
-	
+	Input* _input;
+
 private:
 	vector<char> _rom;				
 	vector<char> _eram;
