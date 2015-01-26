@@ -4,7 +4,11 @@
 
 #include <vector>
 #include <fstream>
+
+#include <iomanip>
 using namespace std;
+
+//#define DEBUG
 
 /*
 
@@ -17,15 +21,39 @@ TODO.
 //-------------------------------------------------------------------------------------
 MMU::MMU()
 {
-
+	std::cout<<"MMU wstaje"<<endl;
 }
 //-------------------------------------------------------------------------------------
 void MMU::init()
-{
-	 _rom = load("GAME.GB");			
-	 _bios = load("BIOS.BIN");
+{			
+	MMU::_inbios = 1;
+	
+	MMU::_ie = 0;
+	MMU::_if = 0;
+	
+	MMU::_carttype = 0;
 
-	 reset();
+	_mbc.rombank = 0;
+	_mbc.rambank = 0;
+	_mbc.ramon = 0;
+	_mbc.mode = 0;
+
+	MMU::_romoffs = 0x4000;
+	MMU::_ramoffs = 0;
+
+	_bios = load("bios.bin");
+	_rom = load("opus5.gb");
+	cout<<"Rozmiar romu: "<<_rom.size()<<endl;
+
+	for(int i=0; i<8192; i++) 
+		MMU::_wram.push_back(0);
+	
+	for(int i=0; i<32768; i++) 
+		MMU::_eram.push_back(0);
+	
+	for(int i=0; i<127; i++) 
+		MMU::_zram.push_back(0);
+
 }
 //-------------------------------------------------------------------------------------
 void MMU::reset() 
@@ -59,6 +87,10 @@ void MMU::reset()
 //-------------------------------------------------------------------------------------
 unsigned char MMU::rb(unsigned short addr)
 {
+#ifdef DEBUG
+	cout<<std::dec<<"Odczyt: "<<addr<<":";
+	cout<<std::hex<<(addr & 0xF000)<<endl;
+#endif
 	switch(addr & 0xF000) 
 		{  
 			 // BIOS (256b) i ROM0 
@@ -67,8 +99,11 @@ unsigned char MMU::rb(unsigned short addr)
 				{ 
 					if(addr < 0x0100)
 						return _bios[addr]; 
-					else if(Z80::_r.pc == 0x0100) 
-						_inbios = 0; 
+					else if(Z80::_r.pc == 0x0100)
+					{
+						_inbios = 0;
+						cout<<"Wychodze z biosu"<<endl;
+					}
 				} 
 				else
 					return _rom[addr]; 
@@ -119,9 +154,8 @@ unsigned char MMU::rb(unsigned short addr)
 					
 					// Grafika -> OAM (Object Attribute Memory) 
 					case 0xE00: 
-						//if(addr < 0xFEA0) return GPU::_oam[addr & 0xFF]; 
-						//else 
-						return 0; 
+						if(addr < 0xFEA0) return _gpu->_oam[addr & 0xFF]; 
+						else return 0; 
 					
 					// Zero-page 
 					case 0xF00:
@@ -139,7 +173,7 @@ unsigned char MMU::rb(unsigned short addr)
 								switch(addr & 0xF)
 								{
 									case 0: 
-										//return KEY::rb(); // JOYP
+										return _input->rb(); // JOYP
 									case 4: case 5: case 6: case 7:
 										//return TIMER::rb(addr);
 									case 15: 
@@ -161,6 +195,10 @@ unsigned char MMU::rb(unsigned short addr)
 //-------------------------------------------------------------------------------------
 void MMU::wb(unsigned char byte, unsigned short addr)
 {
+#ifdef DEBUG
+	cout<<"Zapis: "<<std::dec<<addr<<":";
+	cout<<std::hex<<(addr & 0xF000)<<endl;
+#endif
 	switch(addr & 0xF000)
 	{
 	// ROM bank 0
@@ -226,7 +264,7 @@ void MMU::wb(unsigned char byte, unsigned short addr)
 	case 0x8000: 
 	case 0x9000:
 		_gpu->_vram[addr & 0x1FFF] = byte;
-		_gpu->updateTile( addr & 0x1FFF );
+		_gpu->updateTile( addr );
 		break;
 	
 	// External RAM
@@ -275,7 +313,7 @@ void MMU::wb(unsigned char byte, unsigned short addr)
 					switch(addr & 0xF)
 					{
 						case 0: 
-							//KEY.wb(byte); 
+							_input->wb(byte);
 							break;
 						
 						case 4: case 5: case 6: case 7: 
@@ -293,7 +331,7 @@ void MMU::wb(unsigned char byte, unsigned short addr)
 					
 					//GPU
 					case 0x40: case 0x50: case 0x60: case 0x70:
-					_gpu->wb(addr, byte);
+					_gpu->wb(byte, addr);
 					break;
 				}
 		}
@@ -308,7 +346,8 @@ unsigned short MMU::rw(unsigned short addr)
 //-------------------------------------------------------------------------------------
 void MMU::ww(unsigned short word, unsigned short addr)
 {
-
+	wb(word<<8,addr); wb(word>>8,addr+1);
+	//MMU.wb(addr,val&255); MMU.wb(addr+1,val>>8);
 }
 //-------------------------------------------------------------------------------------
 vector<char> MMU::load(char* filename) 
@@ -316,12 +355,20 @@ vector<char> MMU::load(char* filename)
 	ifstream ifs(filename, ios::binary|ios::ate);
 	ifstream::pos_type pos = ifs.tellg();
  
+	if(!ifs)
+		cout<<"Nie moge otworzyc: "<<filename<<endl;
+	//Tu sie wywala
 	vector<char> result(pos);
  
 	ifs.seekg(0, ios::beg);
 	ifs.read(&result[0], pos);
 	
-	_carttype = result[0x0147];	
+	int carType = 0x0147;
+
+	cout<<"Rozmiar "<<filename<<": "<<result.size()<<endl;
+
+	if(result.size() >= carType)
+		_carttype = result[carType];	
 
 	return result;	
 }

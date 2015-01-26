@@ -1,6 +1,32 @@
 #include "GPU.h"
 #include "Z80.h"
+#include "Input.h"
 #include "Libs\freeglut\freeglut.h"
+
+GPU	*_gpuGlobal = NULL;
+Input * _inputGlobal = NULL;
+
+int GPU::pixelSize = 2;
+
+extern "C" void callbackDraw()
+{
+	_gpuGlobal->draw();
+}
+
+extern "C" void callbackStep()
+{
+	_gpuGlobal->_z80->dispatch();
+}
+
+extern "C" void callbackKeyDown(unsigned char key, int x, int y)
+{
+	_inputGlobal->keyDown(key, x, y);
+}
+
+extern "C" void callbackKeyUp(unsigned char key, int x, int y)
+{
+	_inputGlobal->keyUp(key, x, y);
+}
 
 void GPU::step()
 {
@@ -76,6 +102,7 @@ void GPU::draw()
 {
 	glBegin(GL_QUADS);
 	for(int xPos = 0; xPos < 160; xPos++ )
+	{
 		for(int yPos = 0; yPos < 144; yPos++ )
 		{
 			glColor3f((float)_bufor[xPos][3*yPos]/255, (float)_bufor[xPos][3*yPos+1]/255, (float)_bufor[xPos][3*yPos+2]/255); 
@@ -83,53 +110,24 @@ void GPU::draw()
 			glVertex2f(xPos*pixelSize+pixelSize, yPos*pixelSize);
 			glVertex2f(xPos*pixelSize+pixelSize, yPos*pixelSize+pixelSize);
 			glVertex2f(xPos*pixelSize, yPos*pixelSize+pixelSize);
+
 		}
+	}
 
 	glEnd();
 	glutSwapBuffers();
 	glFlush();
 }
 
-void GPU::initGlut()
-{
-	//Ukrycie okna konsoli
-	/*HWND hWnd = GetConsoleWindow();
-	ShowWindow( hWnd, SW_HIDE );*/
-
-	char *myargv [1];
-	int myargc=1;
-	myargv [0]=_strdup("GB Emulator");
-	glutInit(&myargc, myargv);
-	glutInitDisplayMode(GLUT_DEPTH | GLUT_DOUBLE | GLUT_RGBA);
-	glutInitWindowPosition(200, 100);//pozycja
-	glutInitWindowSize(160*pixelSize, 144*pixelSize); //rozmiar
-	glutCreateWindow("GB Emulator");
- 
-	glClearColor(1.0, 1.0, 1.0, 1.0);
-	glMatrixMode(GL_PROJECTION | GL_MODELVIEW);
-	glLoadIdentity();
-	gluOrtho2D(0, 160*pixelSize, 144*pixelSize, 0);
-
-	
-	glutIdleFunc(this->step);
-	glutDisplayFunc(this->draw);
-	
-	//Obs³uga klawiatury
-	glutSetKeyRepeat(GLUT_KEY_REPEAT_OFF);
-	glutKeyboardFunc(_input->keyDown);
-	glutKeyboardUpFunc(_input->keyUp);
-
-	glutMainLoop();
-}
-
 GPU::GPU()
 {
-	
+	std::cout<<"GPU wstaje"<<endl;
 }
 
 void GPU::init()
 {
-	pixelSize = 2;
+	_gpuGlobal=this;
+	_inputGlobal=_input;
 	reset();
 	initGlut();
 }
@@ -155,9 +153,9 @@ void GPU::reset()
 	{
 		for(int yPos = 0; yPos < 144; yPos++ )
 		{
-			_bufor[xPos][yPos*4]=255;
-			_bufor[xPos][yPos*4+1]=255;
-			_bufor[xPos][yPos*4+2]=255;
+			_bufor[xPos][yPos*3]=255;
+			_bufor[xPos][yPos*3+1]=255;
+			_bufor[xPos][yPos*3+2]=255;
 		}
 	}
 
@@ -195,9 +193,7 @@ void GPU::scanLine()
         if(_bgOn)
         {
 
-			int linebase = _line;
-			//int mapOffs = _bgMapSet + ((_line + _sCY) & 255)>>3;
-			int mapBase = _bgMapSet + ((((_line+_sCY)&255)>>3)<<5);
+			int mapBase = _bgMapSet + ((((_line+_sCY)&255)>>3)<<5); //Z którego zestawu tekstur ci¹gniemy
 			int y = (_line+_sCY)&7;	//ktore piksele z tile pobierac
 			int x = _sCX&7;			//gdzie zaczyna sie linia tile'a
 			int tileOffs = (_sCX>>3)&31;	//Ktory tile bede obrabial
@@ -225,20 +221,24 @@ void GPU::scanLine()
 					}
 				}
 			}
-			/*else
+			else
 			{
-				int tileRow=_tileMap[_vram[mapBase+tileOffs]][y];
+				int tilePos = _vram[mapBase+tileOffs];
+				unsigned char color;
 				for(int xPos = 0; xPos < 160; xPos++)
 				{
-					mapColorThroughPalette(_tileSet[tileRow][x][y], xPos, _line);
+					_scanRow[xPos] = (_tileSet[tilePos][x][y]==0)?0:1;
+					color = _palette.mapThrough(_palette.bg, _tileSet[tilePos][x][y]);
+					writeColorToBufor(color, xPos, _line);
 					x++;
 					if(x==8) 
 					{ 
 						tileOffs=(tileOffs+1)&31; 
-						x=0; 
+						x=0;
+						tilePos = _vram[mapBase+tileOffs];
 					}
 				}
-			}*/
+			}
 
 			if(_objOn)
 			{
@@ -450,18 +450,21 @@ void GPU::wb(unsigned char byte, unsigned short addr)
 	}
 }
 
-void GPU::updateTile(short addr)
+void GPU::updateTile(unsigned short addr)
 {
-	int vramIndex = addr &0x1FFE;
+	int vramIndex=addr&0x1FFF;
 
-	int tile = vramIndex >> 4 & 511;
-	int y = vramIndex >> 1 & 7;
+	if(vramIndex&1) 
+		vramIndex--;
+
+	int tile =(vramIndex>>4)&511;
+	int y=(vramIndex>>1)&7;
 
 	short pxIndex;
 	for(int x = 0; x < 8; x++)
 	{
 		pxIndex = 1 << (7-x);
-		_tileSet[tile][x][y] = ((_vram[addr]&pxIndex)? 1:0) + ((_vram[addr+1] & pxIndex)? 2:0);
+		_tileSet[tile][x][y] = ((_vram[vramIndex]&pxIndex)? 1:0) + ((_vram[vramIndex+1]&pxIndex)? 2:0);
 	}
 }
 
@@ -489,4 +492,36 @@ void GPU::updateObjData(unsigned short addr, unsigned char byte)
 			break;
 		}
 	}
+}
+
+void GPU::initGlut()
+{
+	//Ukrycie okna konsoli
+	//HWND hWnd = GetConsoleWindow();
+	//ShowWindow( hWnd, SW_HIDE );
+
+	char *myargv [1];
+	int myargc=1;
+	myargv [0]=_strdup("GB Emulator");
+	glutInit(&myargc, myargv);
+	glutInitDisplayMode(GLUT_DEPTH | GLUT_DOUBLE | GLUT_RGBA);
+	glutInitWindowPosition(200, 100);//pozycja
+	glutInitWindowSize(160*pixelSize, 144*pixelSize); //rozmiar
+	glutCreateWindow("GB Emulator");
+ 
+	glClearColor(1.0, 1.0, 1.0, 1.0);
+	glMatrixMode(GL_PROJECTION | GL_MODELVIEW);
+	glLoadIdentity();
+	gluOrtho2D(0, 160*pixelSize, 144*pixelSize, 0);
+
+	
+	glutIdleFunc(callbackStep);
+	glutDisplayFunc(callbackDraw);
+	
+	//Obs³uga klawiatury
+	glutSetKeyRepeat(GLUT_KEY_REPEAT_OFF);
+	glutKeyboardFunc(callbackKeyDown);
+	glutKeyboardUpFunc(callbackKeyUp);
+
+	glutMainLoop();
 }

@@ -14,16 +14,16 @@ int main()
 	z80._gpu = &gpu;
 
 	mmu._gpu = &gpu;
+	mmu._input = &input;
 
 	gpu._input = &input;
 	gpu._mmu = &mmu;
+	gpu._z80 = &z80;
 
 	input.init();
 	mmu.init();
-	gpu.init();
 	z80.init();
-
-	z80.dispatch();
+	gpu.init();
 
 	return 0;
 }

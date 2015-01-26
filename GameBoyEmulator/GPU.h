@@ -3,20 +3,25 @@
 #ifndef GPU_H
 #define GPU_H
 
+class Input;
+class MMU;
+class Z80;
+
 class GPU
 {
 public:
 	GPU();
-	~GPU();
+	//~GPU();
 
-	Input* _input;
-	MMU* _mmu;
+	Input *_input;
+	MMU *_mmu;
+	Z80 *_z80;
 
 	static int pixelSize;
 	unsigned char _mode;
-	unsigned short _sCX, _sCY;
+	unsigned char _sCX, _sCY;
 	unsigned short _modeClock;
-	unsigned short _line; //Line i scan sπ tam rozdzielone. Czemu?
+	unsigned char _line; //Line i scan sπ tam rozdzielone. Czemu?
 	
 								//GPU control register	0	1
 	bool _bgOn,					//0	Background: on/off		Off	On
@@ -69,12 +74,12 @@ public:
 
 	bool _scanRow[160];
 
-	void init();
+	void init(); //W≥πcznie ze wskaünikiem na callback.
 	void draw();
 	void reset();
 	void step();
 	void scanLine();
-	void updateTile(short addr);
+	void updateTile(unsigned short addr);
 	void updateObjData(unsigned short addr, unsigned char byte);
 	unsigned char rb(unsigned short addr);
 	void wb(unsigned char byte, unsigned short addr);

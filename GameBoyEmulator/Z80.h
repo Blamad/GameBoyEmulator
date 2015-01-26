@@ -4,15 +4,18 @@
 #ifndef Z80_H
 #define Z80_H
 
+class MMU;
+class GPU;
+
 class Z80
 {
 public:
 	
 	Z80();
-	~Z80();
+	//~Z80();
 	
-	MMU* _mmu;
-	GPU* _gpu;
+	MMU *_mmu;
+	GPU *_gpu;
 
 	struct R 
 	{
@@ -25,7 +28,7 @@ public:
 
 	struct Clock
 	{
-		int m, t;
+		unsigned char m, t;
 	};
 
 	static Clock _clock;
@@ -51,11 +54,12 @@ private:
 	static OpCodeMap _map[];
 	static OpCodeMap _CBmap[];
 	
-	//////////////////////////////////////////////////
-	//												//
-	//				Lista instrukcji				//
-	// http://gameboy.mongenel.com/dmg/opcodes.html	//
-	//////////////////////////////////////////////////
+	//////////////////////////////////////////////////////////////////
+	//																//
+	//						 Lista instrukcji						//
+	//	http://www.pastraiser.com/cpu/gameboy/gameboy_opcodes.html	//
+	//																//
+	//////////////////////////////////////////////////////////////////
 
 	//r - rejestr, n - adres pamieci
 	//r - 8b, rr - 16b, tak samo n.
@@ -154,7 +158,6 @@ private:
 	void LDHLnn();
 	void LDSPnn();
 
-	void LDHLnn();
 	void LDnnHL();
 
 	void LDHLIA();

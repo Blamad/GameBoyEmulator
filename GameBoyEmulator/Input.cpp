@@ -1,5 +1,7 @@
 #include "Input.h"
 
+#include <iostream>
+
 /*
 Pamiêtaj, 0 to przycisk aktywny, 1 to puszczony
 
@@ -20,12 +22,7 @@ Wtedy wiemy który przycisk zosta³ uruchomiony.
 
 Input::Input()
 {
-
-}
-
-Input::~Input()
-{
-
+	std::cout<<"Input wstaje"<<std::endl;
 }
 
 void Input::init()

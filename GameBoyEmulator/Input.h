@@ -6,7 +6,7 @@ class Input
 public:
 
 	Input();
-	~Input();
+	//~Input();
 
 	static const unsigned char KEY_UP = 'w',
 		KEY_DOWN='s',
