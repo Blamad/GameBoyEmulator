@@ -40,17 +40,16 @@ public:
 	unsigned char _ie;					//Interrupt enable (Lokacja w pamieci: FFFF) 
 	unsigned char _if;					//Interrupt flags (Lokacja w pamieci: FF0F) 
 	
-	vector<char> _bios;
 	
-
+	
 	GPU *_gpu;
 	Input *_input;
-	
+
 	
 private:
 	vector<char> _rom;				
 	vector<char> _eram;
-	//vector<char> _bios;
+	vector<char> _bios;
 	vector<char> _wram; 
 	vector<char> _zram;
 
